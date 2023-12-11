@@ -4,7 +4,8 @@ The course covers [statistical methods](https://cpl.uh.edu/index.php/courses/29-
 
 Practice exercises and examples for the class.
 
-# Folder structure for COSC 6323 
+# File structure for COSC 6323 
+```bash
 cosc6323-stats-r-practice/
 |-- RScripts/
 |   |-- lesson1_1.R
@@ -39,3 +40,4 @@ cosc6323-stats-r-practice/
 |-- .gitignore
 |-- LICENSE
 |-- README.md
+```
