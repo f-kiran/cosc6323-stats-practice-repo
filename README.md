@@ -28,7 +28,7 @@ cosc6323-stats-r-practice/
 |-- Documentation/
 |   |-- README.md
 |   |-- code_guide.md
-|-- Resources/
+|-- R-sources/
 |   |-- articles/
 |       |-- R-cheat-sheet.pdf
 |       |-- advanced-R-book.pdf
