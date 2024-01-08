@@ -24,7 +24,7 @@ cosc6323-stats-r-practice/
 |   |-- HW1/
 |       |-- LastName_FirstName_StudID_HW1.zip
 |   |-- HW2/
-|       |-- LastName_FirstName_StudID_HW1.zip
+|       |-- LastName_FirstName_StudID_HW2.zip
 |-- Documentation/
 |   |-- README.md
 |   |-- code_guide.md
