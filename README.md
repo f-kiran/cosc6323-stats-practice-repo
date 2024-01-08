@@ -15,11 +15,12 @@ cosc6323-stats-r-practice/
 |   |-- lesson2/
 |-- Project/
 |   |-- project/
-|       |-- README.md
-|       |-- script1.R
 |       |-- data/
-|           |-- input_data.csv
-|           |-- output_results.csv
+|           |-- raw_data/input_data.csv
+|           |-- processed_data
+|       |-- scripts/.R or .Rmd
+|       |-- output/
+|       |-- README.md
 |-- Exercises/
 |   |-- HW1/
 |       |-- LastName_FirstName_StudID_HW1.zip
