@@ -13,24 +13,21 @@ cosc6323-stats-r-practice/
 |   |-- HW2/
 |       |-- LastName_FirstName_StudID_HW2.zip
 |-- Project/
-|   |-- project/
-|       |-- data/
-|           |-- raw_data/input_data.csv
-|           |-- processed_data
-|       |-- rmd/.Rmd
-|       |-- scripts/.R
-|       |-- output/report1.pdf
-|       |-- README.md
-
+|   |-- data/
+|       |-- raw_data/input_data.csv
+|       |-- processed_data/processed_data.csv
+|   |-- output/report1.pdf
+|   |-- rmd/.Rmd
+|   |-- scripts/.R
+|   |-- README.md
 |-- R_Practices/
 |   |-- lesson1/lesson1_1.R
 |   |-- lesson2/lesson2_1.R
 |-- Sources/
 |   |-- articles/
-|       |-- R-cheat-sheet.pdf
-|       |-- advanced-R-book.pdf
+|       |-- Rbase-cheatsheet.pdf
 |-- Tests/
-|   |-- test_assignment1.R
+|   |-- test_HW1.R
 |   |-- test_project1.R
 |-- .gitignore
 |-- LICENSE
