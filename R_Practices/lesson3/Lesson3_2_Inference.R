@@ -12,6 +12,12 @@
 
 # SAMPLING DISTRIBUTION
 library(dplyr)
+
+# It is a real estate data from the city of Ames, Iowa, USA. 
+# The details of every real estate transaction in Ames is recorded by the City Assessor’s office. 
+# Our particular focus for this lab will be all residential home sales in Ames between 2006 and 2010. 
+# This collection represents our population of interest.
+
 ames <- read.csv("http://bit.ly/315N5R5") 
 dplyr::glimpse(ames) # you need dplyr to use this function
 
@@ -31,7 +37,7 @@ summary(area)[[4]] # Population mean
 
 hist(area,
      main = bquote(paste("Above ground living area (sq.ft.) |", ~italic("n"),  " = ", 
-                         .(length(area)), ", ", ~mu, " = ", .(round(mean(area), 2)), ", ",
+                         .(length(area)), ", ", ~mu, " = ", .(round(mean(area))), ", ",
                          ~sigma, " = ", .(round(sd(area), 2))),
                          )
      )
@@ -82,9 +88,11 @@ hist(sample_means50, breaks = 25,
 
 
 # SAMPLING SIZE AND DISTRIBUTION
+
 # To get a sense of the effect that sample size has on 
 # our distribution, let’s build up two more sampling 
 # distributions: one based on a sample size of 10 and 
+# another based on a sample size of 50 
 # another based on a sample size of 100 from a 
 # population size of 5000.
 
@@ -124,6 +132,7 @@ par(mfrow = c(1, 1))
 # Z-score provides how many standard deviations away a value 
 # is from the mean.
 
+
 # We can use the following formula for z-score calculation.
 # Z-score = (x-μ)/σ
 # x is a raw score to be standardized;
@@ -142,14 +151,6 @@ z_scores
 dev.off()
 plot(z_scores, type="o", col="red")
 
-# what if we will calculate z-scores for the standard normal distribution?
-data_norm <- rnorm(100, mean = 0, sd = 1)
-z_scores_norm <- (data_norm-mean(data_norm))/sd(data_norm)
-plot(z_scores_norm, type="o", col="red")
-
-# how can we get a better picture?
-plot(sort(z_scores_norm), type="o", col="red")
-plot(x = data_norm, y = z_scores_norm)
 
 # Example 2, Single Column in a DataFrame
 data<- data.frame(A = c(2, 5, 6, 7, 9, 13),
@@ -169,6 +170,7 @@ z_scores
 
 # qnorm in r - function to calculate z score in r
 qnorm(0.75, mean = 0, sd = 1)
+
 # Its value being below 1 means that the point that separates the 
 # lower 75% observations and upper 25% observations is within one 
 # standard deviation of the average, towards the right.
@@ -189,17 +191,17 @@ pnorm(1.96)
 qnorm(.05)
 
 # To find a critical value for a two-tailed 95% confidence interval:
-qnorm(1-.05/2)
+qnorm(1- .05/2)
 
 
-# HYPOTHESIS TESTING
-
-
+# HYPOTHESIS TESTING 2 
 
 
 # https://statstutorial.com/how-to-perform-a-one-sample-z-test-in-r-with-examples/
 
-# Z-Test in Statistics with Examples ----
+# Z-Test in Statistics----
+
+
 
 # Example 1: One-sample Z-test
 # Null Hypothesis: The mean of a population is equal to a specified value.
@@ -229,7 +231,7 @@ qqline(dataset)
 
 # Step 1: Define the Null Hypothesis and Alternate Hypothesis.
 # 
-# let μ be the mean weight of almonds
+# let μ be the mean score of the population.
 # 
 # Null Hypothesis: the mean score is equal to 610
 # 
@@ -256,7 +258,6 @@ qqline(dataset)
 
 
 
-
 # Perform one-sample z-test ----
 
 z_test_result<- z.test(x=dataset,mu=610,alternative = "two.sided",sigma.x = 100)
@@ -276,13 +277,9 @@ cat("Hypothesis Test Result:", ifelse(z_test_result$p.value < 0.05, "Reject Null
 # This means we have sufficient evidence to say that the mean score for the students is not equal to 610.
 
 
-# Two Sample z test: 
-##The Two-Sample Z-test is used to compare the means of two samples 
-##to see if it is feasible that they come from the same population.
 
 
-
-# Example 2: Two-sample Z-test
+# Example 2: Two-sample Z-test ----
 # Null Hypothesis: The means of two populations are equal.
 # Alternative Hypothesis: The means of two populations are not equal.
 
