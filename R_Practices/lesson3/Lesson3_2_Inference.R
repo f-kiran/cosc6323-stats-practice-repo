@@ -309,3 +309,59 @@ cat("\nExample 2: Two-sample Z-test\n")
 cat("Test Statistic:", z_test_result$statistic, "\n")
 cat("P-value:", format(z_test_result$p.value,4), "\n")
 cat("Hypothesis Test Result:", ifelse(z_test_result$p.value < 0.05, "Reject Null Hypothesis", "Fail to Reject Null Hypothesis"), "\n\n")
+
+
+
+
+
+## Now if we have time
+## CENTRAL LIMIT THEOREM EXAMPLE
+# https://www.analyticsvidhya.com/blog/2019/05/statistics-101-introduction-central-limit-theorem/
+data<-read.csv("../lesson2/Clt-data.csv")
+dim(data)
+head(data,3)
+
+# Calculate the population mean
+mean(data$Wall.Thickness)
+
+# Plot all the observations in the data
+hist(data$Wall.Thickness,col = "pink",main = "Histogram for Wall Thickness",xlab = "wall thickness")
+abline(v=12.8,col="red",lty=1)
+
+# We will take sample size=10, samples=9000
+# Calculate the arithmetic mean and plot the mean of sample 9000 times
+# draw sufficient samples of size 10, calculate their means, and plot them in R. 
+# We know that the minimum sample size taken should be 30 but let’s just see what happens when we draw 10
+
+s10 <- c()
+
+n = 9000
+
+for (i in 1:n) {
+  s10[i] = mean(sample(data$Wall.Thickness,10, replace = TRUE)) }
+hist(s10, col ="lightgreen", main="Sample size =10",xlab = "wall thickness")
+abline(v = mean(s10), col = "Red")
+
+# Now lets increase the sample size from 10 to 30, 50 and 500:
+s30 <- c()
+s50 <- c()
+s500 <- c()
+
+n = 9000
+
+for ( i in 1:n){
+  s30[i] = mean(sample(data$Wall.Thickness,30, replace = TRUE))
+  s50[i] = mean(sample(data$Wall.Thickness,50, replace = TRUE))
+  s500[i] = mean(sample(data$Wall.Thickness,500, replace = TRUE))
+}
+par(mfrow=c(1,3))
+hist(s30, col ="lightblue",main="Sample size=30",xlab ="wall thickness")
+abline(v = mean(s30), col = "red")
+
+hist(s50, col ="lightgreen", main="Sample size=50",xlab ="wall thickness")
+abline(v = mean(s50), col = "red")
+
+hist(s500, col ="orange",main="Sample size=500",xlab ="wall thickness")
+abline(v = mean(s500), col = "red")
+par(mfrow=c(1,1))
+
