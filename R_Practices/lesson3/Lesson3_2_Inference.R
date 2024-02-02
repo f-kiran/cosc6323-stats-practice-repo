@@ -21,8 +21,8 @@ library(dplyr)
 ames <- read.csv("http://bit.ly/315N5R5") 
 dplyr::glimpse(ames) # you need dplyr to use this function
 
-area <- ames$Gr.Liv.Area
-price <- ames$SalePrice
+area <- ames$Gr.Liv.Area # ground living area
+price <- ames$SalePrice # sale price
 
 head(area, n=10) # show first 10 observations 
 head(price, n=10) # show first 10 observations 
@@ -44,7 +44,7 @@ hist(area,
      
 
 
-
+# Sampling the population
 area <- ames$Gr.Liv.Area # create new dataset containing only variable 'Gr.Liv.Area' from dataset 'ames'
 samp1 <- sample(area, 10) # take a random sample of 10 observations from the dataset 'area'
 mean(samp1) # mean of the sample distribution for area. Note difference from population mean.
@@ -64,6 +64,9 @@ mean(samp2) #
 
 # 2. suppose we have samples n3 = 1500, n4 = 2000. 
 # which is more accurate?
+
+samp2 <- sample(area, 2000.) # take a random sample of 1000 observations from the dataset 'area'
+mean(samp2) #
 
 
 
@@ -148,26 +151,12 @@ z_scores
 # The second raw data value of “7” is -1.2126781 standard deviations below the mean.
 # The ninth raw data value of “18” is 0.2425356 standard deviations above the mean.
 
-dev.off()
-plot(z_scores, type="o", col="red")
-
-
-# Example 2, Single Column in a DataFrame
-data<- data.frame(A = c(2, 5, 6, 7, 9, 13),
-                  B = c(24, 20, 13, 15, 19, 20),
-                  C = c(15, 5, 7, 18, 14, 10))
-z_scores <- (data$B-mean(data$B))/sd(data$B)
-z_scores
-
-# The first raw data value of “24” is 1.3970014 standard deviations 
-# above the mean.
-# The first raw data value of “20” is 0.3810004  standard deviations 
-# above the mean.
-
 
 # In general, the z score tells you how far a value is 
 # from the average of the data in terms of standard deviations.
 
+
+# ----------------
 # qnorm in r - function to calculate z score in r
 qnorm(0.75, mean = 0, sd = 1)
 
@@ -202,12 +191,12 @@ qnorm(1- .05/2)
 # Z-Test in Statistics----
 
 
-
 # Example 1: One-sample Z-test
 # Null Hypothesis: The mean of a population is equal to a specified value.
 # Alternative Hypothesis: The mean of a population is not equal to a specified value.
 
 # Perform one-sample Z-test
+
 #install.packages("BSDA")
 
 # z.test(x,y = NULL,
@@ -226,8 +215,6 @@ dataset <- c(670,730,540,670,480,800,690,560,590,620,700,660,640,710,650,490,800
 
 #Create qqplot for the dataset
 
-qqnorm(dataset)
-qqline(dataset)
 
 # Step 1: Define the Null Hypothesis and Alternate Hypothesis.
 # 
@@ -246,6 +233,7 @@ qqline(dataset)
 # Step 3: Let’s check the assumptions.
 
 
+
 # When to use a z-Test: ----
 
 # - Your sample size must be greater than 30.
@@ -255,12 +243,18 @@ qqline(dataset)
 # - Samples should be drawn at random from the population.
 # - The standard deviation of the population should be known
 
+xlimits <- range(dataset)
+
+hist(dataset,  breaks = 25, xlim = xlimits)
+
+qqnorm(dataset)
+qqline(dataset)
 
 
 
 # Perform one-sample z-test ----
 
-z_test_result<- z.test(x=dataset,mu=610,alternative = "two.sided",sigma.x = 100)
+z_test_result<- z.test(x=dataset, mu=610,alternative = "two.sided",sigma.x = 100)
 z_test_result
 
 # Print the results
@@ -272,12 +266,14 @@ cat("Hypothesis Test Result:", ifelse(z_test_result$p.value < 0.05, "Reject Null
 
 # Conclusion: ----
 #   
-# Since the p-value[0.0476] is less than the level of significance (α) = 0.05, we reject the null hypothesis.
+# Since the p-value[0.0476] is less than the level of significance (α) = 0.05,
+# we reject the null hypothesis.
 # 
-# This means we have sufficient evidence to say that the mean score for the students is not equal to 610.
+# This means we have sufficient evidence to say that 
+# the mean for the students is not equal to 610.
 
 
-
+# --------------------------------------------------------------------------------------------
 
 # Example 2: Two-sample Z-test ----
 # Null Hypothesis: The means of two populations are equal.
@@ -351,14 +347,14 @@ for ( i in 1:n){
   s50[i] = mean(sample(data$Wall.Thickness,50, replace = TRUE))
   s500[i] = mean(sample(data$Wall.Thickness,500, replace = TRUE))
 }
-par(mfrow=c(1,3))
-hist(s30, col ="lightblue",main="Sample size=30",xlab ="wall thickness")
+par(mfrow=c(3,1)) # this create a 3x1 grid of plots
+hist(s30, col ="lightblue",main="Sample size=30",xlab ="wall thickness", breaks = 25)
 abline(v = mean(s30), col = "red")
 
-hist(s50, col ="lightgreen", main="Sample size=50",xlab ="wall thickness")
+hist(s50, col ="lightgreen", main="Sample size=50",xlab ="wall thickness", breaks = 25)
 abline(v = mean(s50), col = "red")
 
-hist(s500, col ="orange",main="Sample size=500",xlab ="wall thickness")
+hist(s500, col ="orange",main="Sample size=500",xlab ="wall thickness", breaks = 25)
 abline(v = mean(s500), col = "red")
 par(mfrow=c(1,1))
 
