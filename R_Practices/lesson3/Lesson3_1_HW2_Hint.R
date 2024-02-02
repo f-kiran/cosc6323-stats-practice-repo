@@ -16,18 +16,6 @@ library(lattice)
 library(gridExtra)
 
 
-# dataDir <- paste0("../../Data/")
-# file = "Multimodal-Activity-Dataset.csv"
-# 
-# 
-# all.df = read.csv(paste0(dataDir, file), stringsAsFactors = F)
-# str(all.df)
-# 
-# all.df %>%
-#   dplyr::select(Time,Activity, HR, Cadence, Activity) %>%
-#   filter(Activity == c("walking", "running"))  -> all.df
-# # 
-# write.csv(all.df, paste0("Multimodal-Activity-Dataset2.csv"), row.names = F)
 
 file = "Lecture3_Dataset.csv"
 
