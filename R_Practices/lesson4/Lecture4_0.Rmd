@@ -96,15 +96,15 @@ sample_10_biking = all.df%>%
 
 
 
-sample_again = function() { 
-  sample_10_biking <<- all.df%>%
-  dplyr::select( Activity, HR, Speed_NR, Cadence)%>%
-  filter(Activity == "biking")%>%
-  sample_n(10)%>%
-  as.data.frame()
-}
+# sample_again = function() { 
+#   sample_10_biking <<- all.df%>%
+#   dplyr::select( Activity, HR, Speed_NR, Cadence)%>%
+#   filter(Activity == "biking")%>%
+#   sample_n(10)%>%
+#   as.data.frame()
+# }
 
-sample_again()
+#sample_again()
 
 H0 = "The mean sample HR of the biking activity is equal to the mean HR of the Biking activity"
 H1 = "The mean sample HR of the biking activity is not equal to the mean HR of the Biking activity"
@@ -214,6 +214,9 @@ act.means= all.df %>%
 biking_HR_mean = act.means[act.means$Activity == "biking",]$HR.mean
 walking_HR_mean = act.means[act.means$Activity == "walking",]$HR.mean
 
+#biking_HR_sd = act.means[act.means$Activity == "biking",]$HR.sd
+#walking_HR_sd = act.means[act.means$Activity == "walking",]$HR.sd
+
 combine_df$Pop_Mean = c(biking_HR_mean, walking_HR_mean)
 
 ```
@@ -229,8 +232,7 @@ colnames(combine_df2)
 
 ```{r include=FALSE}
 
-colnames(combine_df2) <- c("Variable", "Smpl. Group",  "Smpl. Mean", "Pop. Group"," z stats", " t stats", "Pop. Mean", "CI (z)",
-                           "CI (t)","P-value-z", "P-value-t")
+colnames(combine_df2) <- c("Variable", "Smpl. Group",  "Smpl. Mean", "Pop. Group"," z stats", " t stats", "Pop. Mean", "CI (z)", "CI (t)","P-value-z", "P-value-t")
 
 
 ```
@@ -241,23 +243,54 @@ colnames(combine_df2) <- c("Variable", "Smpl. Group",  "Smpl. Mean", "Pop. Group
 
 
 combine_df2 %>%
-  #kable("latex", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
-  kable("markdown", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
-  #kable_styling(latex_options = c("stripdown","hold_position"), font_size = 6)
-  kable_styling(latex_options = c("hold_position"), font_size = 6)
+  kable("latex", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
+  #kable("markdown", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
+  kable_styling(latex_options = c("stripdown","hold_position"), font_size = 6)
+  #kable_styling(latex_options = c("hold_position"), font_size = 6)
 
 
 ```
 
 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-# Q2 - 
+
+combine_df2 %>%
+  #kable("latex", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
+  kable("markdown", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
+  kable_styling(latex_options = c("stripdown","hold_position"), font_size = 6)
+  #kable_styling(latex_options = c("hold_position"), font_size = 6)
+
+
+```
+
+\newpage
+# Q2  
+## Normality Tests
+
+```{r echo=FALSE}
+
+
+
+?shapiro.test()
+
+norm_data = rnorm(100, mean = 5, sd = 3)
+
+plot(density(norm_data))
+hist(norm_data)
+shapiro.test(norm_data)
+
+#H0 = "The data is normally distributed"
+#H1 = "The data is not normally distributed"
+
+# as p-value > 0.05, we fail to reject the null hypothesis and conclude that the data is normally distributed.
+
+```
 
 ```{r echo=TRUE}
-# Check for normality the Office Work, Walking, Running, Biking, and Driving data. Choose carefully the methods that you will use and list the results in table and graphic forms, as needed. Justify your methodology and describe your insights.
 
-
-# Shapiro-Wilk test for normality
+# Check for normality the Office Work, Walking, Running, Biking, and Driving data. 
+# Shapiro-Wilk test for normality HR
 shapiro.test(all.df$HR[all.df$Activity == "office_work"])
 shapiro.test(all.df$HR[all.df$Activity == "walking"])
 shapiro.test(all.df$HR[all.df$Activity == "running"])
@@ -268,6 +301,7 @@ shapiro.test(all.df$HR[all.df$Activity == "driving"])
 ```
 
 ***
+
 
 
 \newpage
@@ -305,15 +339,24 @@ p3 <- ggplot(data=all.df, aes(x=Activity, y=Cadence)) +
     ylab("") + xlab("") + theme_minimal()
    
 
-
-boxplots <- ggarrange(p1, p2, p3, nrow = 1)
+boxplots <- ggarrange(p1, p2, p3, nrow = 1, ncol=3)
 boxplots
 ```
 
 
-## Normality Plots for HR
+## QQ-Plots Normality Plots for HR
+
+### QQ-plots for normal
+
+```{r}
+
+qqnorm(norm_data , pch = 1, frame = FALSE, main = "Normal Q-Q Plot ")
+qqline(norm_data, col = "steelblue", lwd = 2)
+```
 
 
+\newpage
+### qqPlot() from car package
 
 ```{r echo=TRUE}
 library("car")
@@ -321,21 +364,24 @@ library("car")
 a1<- with(all.df, qqPlot(HR, main = "QQ-Plot HR ",  ylab = ""))
 ```
 
-```{r echo=TRUE}
 
+```{r echo=TRUE}
+# normality plots for HR
+?qqnorm()
 qqnorm(all.df$HR, pch = 1, frame = FALSE, main = "Normal Q-Q Plot HR")
 qqline(all.df$HR, col = "steelblue", lwd = 2)
 
 ```
 
+## QQ plot - ggplot 
 
 ```{r echo=FALSE, fig.height=11, fig.width=8.5}
-# normality plots for HR
+# normality plots for HR with ggplot
 library(ggplot2)
 
 p1 <- ggplot(all.df,aes(sample = HR)) +
-    facet_wrap(Activity~., scales = 'free_y',
-             strip.position = "left", nrow =5, ncol = 1)+
+    # facet_wrap(Activity~., scales = 'free_y',
+    #          strip.position = "left", nrow =5, ncol = 1)+
   stat_qq() +
   stat_qq_line(color = "red") +
   labs(title = "HR", x = "", y = "Sample Quantiles") +
@@ -345,6 +391,19 @@ p1
 
 ```
 
+
+## Histograms for HR of all activities
+
+```{r}
+
+p1 <- ggplot(all.df, aes(x = HR)) +
+  geom_histogram(binwidth = 5, fill = "green", color = "black") +
+  facet_wrap(Activity~., scales = 'free_y', nrow = 5, ncol = 1) +
+  theme_minimal() +
+  labs(title = "HR by Activity", x = "HR", y = "Frequency")
+p1
+
+```
 
 
 # Q3 - 
