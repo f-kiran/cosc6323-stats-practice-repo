@@ -1,0 +1,414 @@
+---
+title: "Lecture 4"
+author: "COSC6323/Spring 2024"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    keep_tex: true
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+library(lme4)
+library(readr)
+library(lmerTest)
+library(lattice)
+library(gridExtra)
+library(kableExtra)
+library(BSDA) # for z.test
+library("car") # QQplot
+
+```
+
+```{r include=FALSE}
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+
+```{r include=FALSE}
+# read the all.df file
+# dataDir <- paste0("../lesson3/")
+# file = "Lecture3_Dataset.csv"
+
+dataDir <- paste0("../../Data/")
+file = "Multimodal-Activity-Dataset.csv"
+all.df = read.csv(paste0(dataDir, file), stringsAsFactors = F)
+
+all.df %>%
+  select("Time","Activity",  "HR", "Speed_NR","Cadence") -> all.df
+str(all.df)
+
+
+write.csv(all.df, "Lecture4-Dataset.csv", row.names = F)
+```
+
+```{r include=FALSE}
+
+file = "Lecture4-Dataset.csv"
+all.df = read.csv(file, stringsAsFactors = F)
+
+unique(all.df$ID)
+summary(all.df)
+
+nlevels(all.df$Activity)
+unique(all.df$Activity)
+all.df$Activity = factor(all.df$Activity)#, levels = c("walking", "running"))
+nlevels(all.df$Activity)
+unique(all.df$Activity)
+
+str(all.df)
+```
+
+```{r include=FALSE}
+
+# find the NA rows in HR
+all.df.HR.NAs = all.df[is.na(all.df$HR),]
+nrow(all.df.HR.NAs)
+
+# remove the NA rows in HR
+all.df = all.df[!is.na(all.df$HR),]
+
+```
+
+
+\newpage
+
+# Hypothesis Testing
+
+```{r include=FALSE}
+
+
+# sampling <- function(all.df, activity, n){
+#   all.df%>%
+#     filter(Activity == activity)%>%
+#     sample_n( n)
+# }
+# 
+# sample_10_walking = sampling(all.df, "walking", 10)
+
+
+# Biking
+sample_10_biking = all.df%>%
+  dplyr::select( Activity, HR, Speed_NR, Cadence)%>%
+  filter(Activity == "biking")%>%
+  mutate(mean_HR = mean(HR), mean_Speed_NR = mean(Speed_NR), mean_Cadence = mean(Cadence))%>%
+  mutate(sd_HR = sd(HR), sd_Speed_NR = sd(Speed_NR), sd_Cadence = sd(Cadence))%>%
+  sample_n(10)%>%
+  as.data.frame()
+
+
+
+sample_again = function() { 
+  sample_10_biking <<- all.df%>%
+  dplyr::select( Activity, HR, Speed_NR, Cadence)%>%
+  filter(Activity == "biking")%>%
+  sample_n(10)%>%
+  as.data.frame()
+}
+
+sample_again()
+
+H0 = "The mean sample HR of the biking activity is equal to the mean HR of the Biking activity"
+H1 = "The mean sample HR of the biking activity is not equal to the mean HR of the Biking activity"
+
+
+# Biking
+# 10
+ sigmax = sd(all.df$HR[all.df$Activity == "biking"])
+ 
+ ?z.test()
+ 
+z_bk_HR_n10 <- z.test(sample_10_biking$HR, mu = mean(all.df$HR[all.df$Activity == "biking"]), sigma.x = sigmax, alternative = "two.sided", conf.level = 0.95)
+z_bk_HR_n10
+
+
+if (z_bk_HR_n10$p.value < 0.05) {
+  print("Reject the null hypothesis")
+} else {
+  print("Fail to reject the null hypothesis")
+}
+
+z_bk_HR_n10_W <- z.test(sample_10_biking$HR, mu = mean(all.df$HR[all.df$Activity == "walking"]), sigma.x = sigmax, alternative = "two.sided", conf.level = 0.95)
+
+z_bk_HR_n10_W
+
+if (z_bk_HR_n10_W$p.value < 0.05) {
+  print("Reject the null hypothesis")
+} else {
+  print("Fail to reject the null hypothesis")
+}
+
+
+#t test
+
+# 10
+t_bk_HR_n10 <- t.test(sample_10_biking$HR, mu = mean(all.df$HR[all.df$Activity == "biking"]), alternative = "two.sided", conf.level = 0.95)
+t_bk_HR_n10_W <- t.test(sample_10_biking$HR, mu = mean(all.df$HR[all.df$Activity == "walking"]), alternative = "two.sided", conf.level = 0.95)
+
+
+sample_again()
+z_bk_Speed_NR_n10 <- z.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "biking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
+z_bk_Speed_NR_n10_W <- z.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "walking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
+
+
+t_bk_Speed_NR_n10 <- t.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "biking"]), alternative = "two.sided", conf.level = 0.95)
+t_bk_Speed_NR_n10_W <- t.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "walking"]), alternative = "two.sided", conf.level = 0.95)
+
+sample_again()
+
+z_bk_Cadence_n10 <- z.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "biking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
+#z_bk_Cadence_n10
+z_bk_Cadence_n10_W <- z.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "walking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
+t_bk_Cadence_n10 <- t.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "biking"]), alternative = "two.sided", conf.level = 0.95)
+t_bk_Cadence_n10_W <- t.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "walking"]), alternative = "two.sided", conf.level = 0.95)
+
+
+
+```
+
+
+
+```{r echo=FALSE}
+
+df_HR <- data.frame(
+  Sample.Group = c("Biking-10", "Biking-10"),
+  
+  Sample_mean = c(mean(sample_10_biking$HR), mean(sample_10_biking$HR)),
+  Pop.Group = c("Biking", "Walking"),
+  z_statistic = c(z_bk_HR_n10$statistic,z_bk_HR_n10_W$statistic),
+  t_statistic = c(t_bk_HR_n10$statistic,t_bk_HR_n10_W$statistic),
+  CI_z = c(paste0(round(z_bk_HR_n10$conf.int[1], 2), " - ", round(z_bk_HR_n10$conf.int[2], 2)), 
+           paste0(round(z_bk_HR_n10_W$conf.int[1], 2), " - ", round(z_bk_HR_n10_W$conf.int[2], 2))
+           ),
+  CI_t = c(paste0(round(t_bk_HR_n10$conf.int[1], 2), " - ", round(t_bk_HR_n10$conf.int[2], 2)),
+           paste0(round(t_bk_HR_n10_W$conf.int[1], 2), " - ", round(t_bk_HR_n10_W$conf.int[2], 2))
+           ),
+  p_value_z = c(z_bk_HR_n10$p.value, z_bk_HR_n10_W$p.value),
+  p_value_t = c(t_bk_HR_n10$p.value, t_bk_HR_n10_W$p.value)
+)
+
+#df_HR
+
+#Speed
+#Cadence
+
+
+#combine_df= rbind(df_HR)
+combine_df= df_HR
+combine_df$Variable = rep(c("HR"), each = 2 )
+
+
+act.means= all.df %>% 
+  group_by(Activity) %>% 
+  summarise(
+            HR.mean = round(mean(HR, na.rm = T),2),
+            HR.sd = round(sd(HR, na.rm = T),2),
+            Speed.mean = round(mean(Speed_NR, na.rm = T),2),
+            Speed.sd = round(sd(Speed_NR, na.rm = T),2),
+            Cadence.mean = round(mean(Cadence, na.rm = T),2),
+            Cadence.sd = round(sd(Cadence, na.rm = T),2)
+            )
+            
+biking_HR_mean = act.means[act.means$Activity == "biking",]$HR.mean
+walking_HR_mean = act.means[act.means$Activity == "walking",]$HR.mean
+
+# biking_Speed_mean = act.means[act.means$Activity == "biking",]$Speed.mean
+# walking_Speed_mean = act.means[act.means$Activity == "walking",]$Speed.mean
+# 
+# biking_Cadence_mean = act.means[act.means$Activity == "biking",]$Cadence.mean
+# walking_Cadence_mean = act.means[act.means$Activity == "walking",]$Cadence.mean
+
+
+combine_df$Pop_Mean = c(biking_HR_mean, walking_HR_mean)
+
+#combine_df$Population_Sd = rep(c(biking_HR_sd, walking_HR_sd, biking_Speed_sd, walking_Speed_sd, biking_Cadence_sd, walking_Cadence_sd), each = 2)
+
+```
+
+```{r include=FALSE}
+# reorder the columns
+colnames(combine_df)
+
+combine_df2 <- combine_df[, c( 10, 1:3, 11,4:9)]
+colnames(combine_df2)
+
+```
+
+```{r include=FALSE}
+
+#if values are less then 0.001, then we can replace them with "<0.001"
+#combine_df2$p_value_z <- ifelse(combine_df2$p_value_z < 0.001, "< 0.001", round(combine_df2$p_value_z, 3))
+#combine_df2$p_value_t <- ifelse(combine_df2$p_value_t < 0.001, "< 0.001", round(combine_df2$p_value_t, 3))
+colnames(combine_df2) <- c("Variable", "Smpl. Group",  "Smpl. Mean", "Pop. Group"," z stats", " t stats", "Pop. Mean", "CI (z)",
+                           "CI (t)","P-value-z", "P-value-t")
+
+
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+
+combine_df2 %>%
+  #kable("latex", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
+  kable("markdown", booktabs = T, caption = "Hypothesis Testing", digits = 3) %>%
+  #kable_styling(latex_options = c("stripdown","hold_position"), font_size = 6)
+  kable_styling(latex_options = c("hold_position"), font_size = 6)
+
+
+```
+
+
+
+# Q2 - 
+
+```{r echo=TRUE}
+# Check for normality the Office Work, Walking, Running, Biking, and Driving data. Choose carefully the methods that you will use and list the results in table and graphic forms, as needed. Justify your methodology and describe your insights.
+
+
+# Shapiro-Wilk test for normality
+shapiro.test(all.df$HR[all.df$Activity == "office_work"])
+shapiro.test(all.df$HR[all.df$Activity == "walking"])
+shapiro.test(all.df$HR[all.df$Activity == "running"])
+shapiro.test(all.df$HR[all.df$Activity == "biking"])
+shapiro.test(all.df$HR[all.df$Activity == "driving"])
+
+
+```
+
+***
+
+
+\newpage
+## Boxplots for HR
+
+```{r echo=FALSE, fig.height=5, fig.width=13}
+# Boxplots for HR, Speed, and Cadence
+ggplot(all.df,aes(y = HR)) +
+    facet_wrap(Activity~., #scales = 'free_y',
+             strip.position = "top", nrow =1, ncol = 5)+
+  geom_boxplot() + theme_bw()
+```
+
+
+
+```{r echo=FALSE, fig.height=5, fig.width=13}
+p1 <-ggplot(data=all.df, aes(x=Activity, y=HR)) + 
+    geom_boxplot() +
+    geom_boxplot(fill = "lightblue") +
+  ggtitle("HR by Activity") +
+    ylab("") + xlab("") + theme_minimal()
+
+
+p2 <- ggplot(data=all.df, aes(x=Activity, y=Speed_NR)) + 
+    geom_boxplot() +
+    geom_boxplot(fill = "orange") + 
+    ggtitle("Speed by Activity") +
+    ylab("") + xlab("") + theme_minimal()
+
+
+p3 <- ggplot(data=all.df, aes(x=Activity, y=Cadence)) + 
+    geom_boxplot() +
+    geom_boxplot(fill = "lightgreen") + 
+    ggtitle("Cadence by Activity") +
+    ylab("") + xlab("") + theme_minimal()
+   
+
+
+boxplots <- ggarrange(p1, p2, p3, nrow = 1)
+boxplots
+```
+
+
+## Normality Plots for HR
+
+
+
+```{r echo=TRUE}
+library("car")
+#a1<- with(all.df, qqPlot(HR, main = "QQ-Plot HR ", ylim = range(0:200),  ylab = ""))
+a1<- with(all.df, qqPlot(HR, main = "QQ-Plot HR ",  ylab = ""))
+```
+
+```{r echo=TRUE}
+
+qqnorm(all.df$HR, pch = 1, frame = FALSE, main = "Normal Q-Q Plot HR")
+qqline(all.df$HR, col = "steelblue", lwd = 2)
+
+```
+
+
+```{r echo=FALSE, fig.height=11, fig.width=8.5}
+# normality plots for HR
+library(ggplot2)
+
+p1 <- ggplot(all.df,aes(sample = HR)) +
+    facet_wrap(Activity~., scales = 'free_y',
+             strip.position = "left", nrow =5, ncol = 1)+
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "HR", x = "", y = "Sample Quantiles") +
+ theme_bw()
+
+p1
+
+```
+
+
+
+# Q3 - 
+
+# One-Sample Chi-Squared Test on Variance
+```{r}
+# Realistic Check on Variance: According to large scale studies, the standard deviation of HR in sitting adults is 14.5 BPM. Check if the Office Work HR data of the Multimodal_Activity_Dataset have standard deviation that significantly exceeds the 14.5 BPM benchmark. Justify your methodology and describe your insights.
+
+# Test for the standard deviation of HR in Office Work
+office_work_HR_sd <- sd(all.df$HR[all.df$Activity == "office_work"])
+office_work_HR_sd
+
+office_work_HR_mean <- mean(all.df$HR[all.df$Activity == "office_work"])
+
+
+
+DF_HR= (length(all.df$HR[all.df$Activity == "office_work"]) - 1)
+DF_HR
+
+
+
+benchmark = 14.5
+# Test statistic
+chi_sq <- ( DF_HR * (office_work_HR_sd^2)) / benchmark ^ 2
+chi_sq
+
+# p-value
+p_value <- 1 - pchisq(chi_sq, df = length(all.df$HR[all.df$Activity == "office_work"]) - 1)
+p_value
+
+
+
+
+library(EnvStats) # var test 
+?varTest()
+
+data= all.df$HR[all.df$Activity == "office_work"]
+
+varTest(data, alternative = "greater", conf.level = 0.95, 
+    sigma.squared = 14.5^2, data.name = NULL)
+
+
+```
+
