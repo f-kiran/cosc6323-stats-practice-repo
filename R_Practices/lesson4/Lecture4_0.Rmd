@@ -9,6 +9,16 @@ output:
     df_print: paged
 ---
 
+```{r}
+# 1 z-test of one sample mean
+# 2. t-test of one sample mean
+# 3. QQ-plots
+```
+
+
+
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 ```
@@ -37,23 +47,6 @@ setwd(dir)
 getwd()
 ```
 
-
-```{r include=FALSE}
-# read the all.df file
-# dataDir <- paste0("../lesson3/")
-# file = "Lecture3_Dataset.csv"
-
-dataDir <- paste0("../../Data/")
-file = "Multimodal-Activity-Dataset.csv"
-all.df = read.csv(paste0(dataDir, file), stringsAsFactors = F)
-
-all.df %>%
-  select("Time","Activity",  "HR", "Speed_NR","Cadence") -> all.df
-str(all.df)
-
-
-write.csv(all.df, "Lecture4-Dataset.csv", row.names = F)
-```
 
 ```{r include=FALSE}
 
@@ -91,15 +84,6 @@ all.df = all.df[!is.na(all.df$HR),]
 ```{r include=FALSE}
 
 
-# sampling <- function(all.df, activity, n){
-#   all.df%>%
-#     filter(Activity == activity)%>%
-#     sample_n( n)
-# }
-# 
-# sample_10_walking = sampling(all.df, "walking", 10)
-
-
 # Biking
 sample_10_biking = all.df%>%
   dplyr::select( Activity, HR, Speed_NR, Cadence)%>%
@@ -127,9 +111,9 @@ H1 = "The mean sample HR of the biking activity is not equal to the mean HR of t
 
 # Biking
 # 10
- sigmax = sd(all.df$HR[all.df$Activity == "biking"])
- 
- ?z.test()
+sigmax = sd(all.df$HR[all.df$Activity == "biking"])
+sigmax 
+?z.test()
  
 z_bk_HR_n10 <- z.test(sample_10_biking$HR, mu = mean(all.df$HR[all.df$Activity == "biking"]), sigma.x = sigmax, alternative = "two.sided", conf.level = 0.95)
 z_bk_HR_n10
@@ -154,24 +138,28 @@ if (z_bk_HR_n10_W$p.value < 0.05) {
 
 #t test
 
-# 10
 t_bk_HR_n10 <- t.test(sample_10_biking$HR, mu = mean(all.df$HR[all.df$Activity == "biking"]), alternative = "two.sided", conf.level = 0.95)
 t_bk_HR_n10_W <- t.test(sample_10_biking$HR, mu = mean(all.df$HR[all.df$Activity == "walking"]), alternative = "two.sided", conf.level = 0.95)
 
+#sample_again()
 
-sample_again()
+#Speed_NR
+#z-test
 z_bk_Speed_NR_n10 <- z.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "biking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
 z_bk_Speed_NR_n10_W <- z.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "walking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
 
-
+#t test
 t_bk_Speed_NR_n10 <- t.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "biking"]), alternative = "two.sided", conf.level = 0.95)
 t_bk_Speed_NR_n10_W <- t.test(sample_10_biking$Speed_NR, mu = mean(all.df$Speed_NR[all.df$Activity == "walking"]), alternative = "two.sided", conf.level = 0.95)
 
-sample_again()
-
+#sample_again()
+# Cadence
+#z-test
 z_bk_Cadence_n10 <- z.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "biking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
 #z_bk_Cadence_n10
 z_bk_Cadence_n10_W <- z.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "walking"]), sigma.x = sigmax, sigma.y = sigmay, alternative = "two.sided", conf.level = 0.95)
+
+# test
 t_bk_Cadence_n10 <- t.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "biking"]), alternative = "two.sided", conf.level = 0.95)
 t_bk_Cadence_n10_W <- t.test(sample_10_biking$Cadence, mu = mean(all.df$Cadence[all.df$Activity == "walking"]), alternative = "two.sided", conf.level = 0.95)
 
@@ -225,16 +213,7 @@ act.means= all.df %>%
 biking_HR_mean = act.means[act.means$Activity == "biking",]$HR.mean
 walking_HR_mean = act.means[act.means$Activity == "walking",]$HR.mean
 
-# biking_Speed_mean = act.means[act.means$Activity == "biking",]$Speed.mean
-# walking_Speed_mean = act.means[act.means$Activity == "walking",]$Speed.mean
-# 
-# biking_Cadence_mean = act.means[act.means$Activity == "biking",]$Cadence.mean
-# walking_Cadence_mean = act.means[act.means$Activity == "walking",]$Cadence.mean
-
-
 combine_df$Pop_Mean = c(biking_HR_mean, walking_HR_mean)
-
-#combine_df$Population_Sd = rep(c(biking_HR_sd, walking_HR_sd, biking_Speed_sd, walking_Speed_sd, biking_Cadence_sd, walking_Cadence_sd), each = 2)
 
 ```
 
@@ -249,9 +228,6 @@ colnames(combine_df2)
 
 ```{r include=FALSE}
 
-#if values are less then 0.001, then we can replace them with "<0.001"
-#combine_df2$p_value_z <- ifelse(combine_df2$p_value_z < 0.001, "< 0.001", round(combine_df2$p_value_z, 3))
-#combine_df2$p_value_t <- ifelse(combine_df2$p_value_t < 0.001, "< 0.001", round(combine_df2$p_value_t, 3))
 colnames(combine_df2) <- c("Variable", "Smpl. Group",  "Smpl. Mean", "Pop. Group"," z stats", " t stats", "Pop. Mean", "CI (z)",
                            "CI (t)","P-value-z", "P-value-t")
 
