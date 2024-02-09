@@ -4,17 +4,11 @@ author: "COSC6323/Spring 2024"
 date: "`r Sys.Date()`"
 output:
   pdf_document: 
+    toc: true
     keep_tex: true
-  html_document:
-    df_print: paged
+    
+
 ---
-
-```{r}
-# 1 z-test of one sample mean
-# 2. t-test of one sample mean
-# 3. QQ-plots
-```
-
 
 
 
@@ -77,9 +71,16 @@ all.df = all.df[!is.na(all.df$HR),]
 ```
 
 
-\newpage
+```{r}
+# 1 z-test of one sample mean
+# 2. t-test of one sample mean
+# 3. QQ-plots
+# 4. Variance test 
+```
 
-# Hypothesis Testing
+\newpage
+# Q1
+## Hypothesis Testing
 
 ```{r include=FALSE}
 
@@ -348,7 +349,7 @@ p1
 
 # Q3 - 
 
-# One-Sample Chi-Squared Test on Variance
+## One-Sample Chi-Squared Test on Variance
 ```{r}
 # Realistic Check on Variance: According to large scale studies, the standard deviation of HR in sitting adults is 14.5 BPM. Check if the Office Work HR data of the Multimodal_Activity_Dataset have standard deviation that significantly exceeds the 14.5 BPM benchmark. Justify your methodology and describe your insights.
 
@@ -374,8 +375,13 @@ chi_sq
 p_value <- 1 - pchisq(chi_sq, df = length(all.df$HR[all.df$Activity == "office_work"]) - 1)
 p_value
 
+```
 
 
+
+## With varTest()
+
+```{r}
 
 library(EnvStats) # var test 
 ?varTest()
