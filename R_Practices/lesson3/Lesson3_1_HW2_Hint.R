@@ -2,6 +2,9 @@
 # Lecture 3
 ## HW2 Hints
 
+#Sources:
+  # https://plotly-r.com/d-charts
+
 
 library(tidyverse)
 library(dplyr)
@@ -46,7 +49,7 @@ str(all.df)
 
 # - Filters
 # 
-# CH1 (HR) 		CH2(Cadence)   Product
+#               CH1 (HR) 		CH2(Cadence)   Product(multip)
 # Entity A (Wlk)
 # 
 # Entity B (Rnng)
@@ -78,7 +81,7 @@ tmp.d1 <- density(all.df[all.df$Activity == "walking",]$HR)
 plot(tmp.d1, main = "Walking HR Density")
 
 # create a function / filter
-?approxfun
+#?approxfun
 # plot the function
 tmm.p.d_fun1 <- approxfun(tmp.d1$x, tmp.d1$y)
 points(tmp.d1$x, tmp.d1$y, col = "red")
@@ -131,6 +134,9 @@ tmp.min = 0
 tmp.max = 0.3
 
 
+
+
+
 P11<-all.df %>%
   filter(Activity == tmp_activity) %>%
   ggplot() +
@@ -148,13 +154,10 @@ P12 <- all.df %>%
   labs(x =  "", y = "") + ggtitle("Walk Cadence Filter")
 
 P12
+
 P13<-all.df %>%
   filter(Activity == tmp_activity) %>%
   ggplot() +
-  # geom_rect(aes(xmin = Time2,
-  #               xmax = dplyr::lead(Time2),
-  #               ymin = 0, ymax = Inf,
-  #               fill = winner1), alpha = 1) +
   geom_line( aes(x=Time, y = walk_multi) ) +
   theme_bw() +ylim(tmp.min,tmp.max) +
   labs(x =  "", y = "") + ggtitle("Combine Walking  Filter")
@@ -296,48 +299,46 @@ ggsave("Final_final.pdf", plot = Final_final, width = 10, height = 10, units = "
 
 
 
-------------
+#------------
 
 # find the max label for each activity in product and save it's index to color background
 
-mycolors <- c(winner = "red", loser = "white")
-
-all.df %>% 
- mutate(max_ind = pmap_int(list(walk_multi, run_multi), ~which.max(c(...)))) 
-all.df
-
-pmap_int(list(all.df$walk_multi, all.df$run_multi), ~which.max(c(...)))
-
-sum(is.na(all.df$walk_multi))
-sum(is.na(all.df$run_multi))
-
-
-
-
+# mycolors <- c(winner = "red", loser = "white")
+# 
+# all.df %>% 
+#  mutate(max_ind = pmap_int(list(walk_multi, run_multi), ~which.max(c(...)))) 
+# all.df
+# 
+# pmap_int(list(all.df$walk_multi, all.df$run_multi), ~which.max(c(...)))
+# 
+# sum(is.na(all.df$walk_multi))
+# sum(is.na(all.df$run_multi))
 
 
 
 #3D visualization
 library(plotly)
 
+# https://plotly-r.com/d-charts
 
-# 2 D
-all.df %>%
-  #filter(Activity == tmp_activity) %>%
-  plot_ly(x = ~HR ~Cadence    ,
-          color = ~Activity, colors = c("gray", "green", "brown", "orange", "cyan"),
-          #type = "mesh3d") %>%
-  #type = "scatter3d",
-  mode = "markers") %>%
-  layout(title = paste0("3D Visualization of Activities"),
-         scene = list(xaxis = list(title = "HR [BPM]"),
-                      yaxis = list(title = "Speed [km/h]"),
-                      zaxis = list(title = "Cadence [RPM]")) )
+# 1 D 
+# all.df %>%
+#   #filter(Activity == tmp_activity) %>%
+#   plot_ly(x = ~HR ~Cadence,
+#           color = ~Activity, colors = c("gray", "green", "brown", "orange", "cyan"),
+#           #type = "mesh3d") %>%
+#   #type = "scatter3d",
+#   mode = "markers") %>%
+#   layout(title = paste0("3D Visualization of Activities"),
+#          scene = list(xaxis = list(title = "HR [BPM]"),
+#                       yaxis = list(title = "Speed [km/h]"),
+#                       zaxis = list(title = "Cadence [RPM]")) )
 
 
 # 2 Dimensional Visualization  on time
+all.df$Time2 =0
 
-
+#1D
 all.df %>%
   #filter(Activity == tmp_activity) %>%
   plot_ly(x = ~Time  , y = ~HR  ,
@@ -374,7 +375,7 @@ all.df %>%
           color = ~Activity, colors = c("gray", "green", "brown", "orange", "cyan"),
   #        type = "mesh3d") %>%
   type = "scatter",mode = "markers") %>%
-  layout(title = paste0("3D Visualization of Activities"),
+  layout(title = paste0("2D Visualization of Activities"),
          scene = list(xaxis = list(title = "HR [BPM]"),
                       yaxis = list(title = "Speed [km/h]"),
                       zaxis = list(title = "Cadence [RPM]")) )
@@ -383,7 +384,7 @@ all.df %>%
 
 
 
-
+browseURL("Lesson3_2_Inference.R")
 
 
 
