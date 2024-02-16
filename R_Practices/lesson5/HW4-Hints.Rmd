@@ -1,0 +1,696 @@
+---
+title: "HW4 Hints - Lesson 5"
+author: "COSC6323/Spring 2024"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    keep_tex: true
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+library(lme4)
+library(readr)
+library(lmerTest)
+library(lattice)
+# library(MASS)
+library(gridExtra)
+library(kableExtra)
+library(BSDA) # for z.test
+library("car") # QQplot
+```
+
+```{r include=FALSE}
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+
+```{r include=FALSE}
+# read the all.df file
+dataDir <- paste0("../Data/")
+file <- "Multimodal-Activity-Dataset.csv"
+all.df <- read.csv(paste0(dataDir, file), stringsAsFactors = F)
+str(all.df)
+
+# all.df <- all.df[-c(6957:6393),] remove the cadence in driving
+
+unique(all.df$ID)
+summary(all.df)
+
+nlevels(all.df$Activity)
+unique(all.df$Activity)
+all.df$Activity <- factor(all.df$Activity, levels = c("office_work", "walking", "running", "biking", "driving"))
+nlevels(all.df$Activity)
+unique(all.df$Activity)
+# find the NA rows in HR
+
+all.df.HR.NAs <- all.df[is.na(all.df$HR), ]
+nrow(all.df.HR.NAs)
+
+# remove the NA rows in HR
+all.df <- all.df[!is.na(all.df$HR),]
+all.df <- all.df %>% group_by(ID)
+```
+
+
+```{r include=FALSE}
+## Remove data point where HR is NA, Most of the case any HR file data has NA
+
+
+activity_names <- c(
+  `office_work` = "Office Work",
+  `walking` = "Walking",
+  `running` = "Running",
+  `biking` = "Biking",
+  `driving` = "Driving"
+)
+
+
+
+
+activity = "office_work"
+
+
+#  Channel based functions
+#rm(density_fun_HR)
+density_fun_HR <- function(x,activity){
+  all.df.HR <-density(all.df[all.df$Activity == activity,]$HR)
+  all.df.HR_fun <- approxfun(all.df.HR$x, all.df.HR$y)
+  return(all.df.HR_fun(x))
+}
+
+
+density_fun_HR(0:200,activity)
+
+density_fun_Speed <- function(x,activity){
+  all.df.Speed_NR <-density(all.df[all.df$Activity == activity,]$Speed_NR)
+  all.df.Speed_fun <- approxfun(all.df.Speed_NR$x, all.df.Speed_NR$y)
+  return(all.df.Speed_fun(x))
+}
+
+density_fun_Speed(0:75,activity)
+
+density_fun_Cadence <- function(x,activity){
+  all.df.Cadence <-density(all.df[all.df$Activity == activity,]$Cadence)
+  all.df.Cadence_fun <- approxfun(all.df.Cadence$x, all.df.Cadence$y)
+  return(all.df.Cadence_fun(x))
+}
+
+
+all.df.Cadence <-density(all.df[all.df$Activity == activity,]$Cadence)
+plot(all.df.Cadence, main = "Density Estimation")
+all.df.Cadence_fun <- approxfun(all.df.Cadence$x, all.df.Cadence$y)
+
+density_fun_Cadence(1:100,activity)
+
+# table(all.df$Cadence, all.df$Activity) 
+# table(all.df$HR, all.df$Activity) 
+# table(all.df$Speed, all.df$Activity)
+
+
+
+# create a function for each channel and activity
+
+# HR
+
+density_fun_HR_office_work = function(x) density_fun_HR(x,"office_work")
+density_fun_HR_walking = function(x) density_fun_HR(x,"walking")
+density_fun_HR_running = function(x) density_fun_HR(x,"running")
+density_fun_HR_biking = function(x) density_fun_HR(x,"biking")
+density_fun_HR_driving = function(x) density_fun_HR(x,"driving")
+
+density_fun_HR_biking(40:200)
+
+
+# Speed 
+
+density_fun_Speed_office_work = function(x) density_fun_Speed(x,"office_work")
+density_fun_Speed_walking = function(x) density_fun_Speed(x,"walking")
+density_fun_Speed_running = function(x) density_fun_Speed(x,"running")
+density_fun_Speed_biking = function(x) density_fun_Speed(x,"biking")
+density_fun_Speed_driving = function(x) density_fun_Speed(x,"driving")
+
+density_fun_Speed_office_work(10)
+
+
+# Cadence
+
+density_fun_Cadence_office_work = function(x) density_fun_Cadence(x,"office_work")
+density_fun_Cadence_walking = function(x) density_fun_Cadence(x,"walking")
+density_fun_Cadence_running = function(x) density_fun_Cadence(x,"running")
+density_fun_Cadence_biking = function(x) density_fun_Cadence(x,"biking")
+density_fun_Cadence_driving = function(x) density_fun_Cadence(x,"driving")
+
+density_fun_Cadence_office_work(10)
+
+
+##### ------ Channel based functions --- end
+```
+
+```{r eval=FALSE, include=FALSE}
+
+#  Channel based functions
+rm(density_fun_HR)
+density_fun_HR <- function(x, activity) {
+  all.df.HR <- density(all.df[all.df$Activity == activity, ]$HR)
+  all.df.HR_fun <- approxfun(all.df.HR$x, all.df.HR$y)
+  return(all.df.HR_fun(x))
+}
+
+density_fun_HR(111, "driving")
+plot(density_fun_HR(80:200, "driving"))
+
+density_fun_Speed <- function(x, activity) {
+  all.df.Speed_NR <- density(all.df[all.df$Activity == activity, ]$Speed_NR)
+  all.df.Speed_fun <- approxfun(all.df.Speed_NR$x, all.df.Speed_NR$y)
+  return(all.df.Speed_fun(x))
+}
+
+density_fun_Speed(10, "office_work")
+
+density_fun_Cadence <- function(x, activity) {
+  all.df.Cadence <- density(all.df[all.df$Activity == activity, ]$Cadence)
+  all.df.Cadence_fun <- approxfun(all.df.Cadence$x, all.df.Cadence$y)
+  return(all.df.Cadence_fun(x))
+}
+
+plot(density_fun_Cadence(1:100, "office_work"))
+
+# ---- Channel based functions --- end
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# my density function
+channel <- "HR"
+activity <- "driving"
+
+rm(density_fun)
+density_fun <- function(input, activity, channel) {
+  tmp.density <- density(all.df[all.df$Activity == activity, c(channel)][[1]])
+  tmp.density_fun <- approxfun(tmp.density$x, tmp.density$y)
+  return(tmp.density_fun(input))
+}
+```
+
+```{r include=FALSE}
+# Create new df with density values
+all.df_extented_2 <- all.df %>%
+  mutate(
+    Offc_HR.dens = density_fun(HR, "office_work", "HR"),
+    Offc_Speed_NR.den = density_fun(Speed_NR, "office_work", "Speed_NR"),
+    Offc_Cadence.dens = density_fun(Cadence, "office_work", "Cadence"),
+    Offc_multi.dens = Offc_HR.dens * Offc_Speed_NR.den * Offc_Cadence.dens
+  ) %>%
+  mutate(
+    Wlkg_HR.dens = density_fun(HR, "walking", "HR"),
+    Wlkg_Speed_NR.den = density_fun(Speed_NR, "walking", "Speed_NR"),
+    Wlkg_Cadence.dens = density_fun(Cadence, "walking", "Cadence"),
+    Wlkg_multi.dens = Wlkg_HR.dens * Wlkg_Speed_NR.den * Wlkg_Cadence.dens
+  ) %>%
+  mutate(
+    Rnng_HR.dens = density_fun(HR, "running", "HR"),
+    Rnng_Speed_NR.den = density_fun(Speed_NR, "running", "Speed_NR"),
+    Rnng_Cadence.dens = density_fun(Cadence, "running", "Cadence"),
+    Rnng_multi.dens = Rnng_HR.dens * Rnng_Speed_NR.den * Rnng_Cadence.dens
+  ) %>%
+  mutate(
+    Bkg_HR.dens = density_fun(HR, "biking", "HR"),
+    Bkg_Speed_NR.den = density_fun(Speed_NR, "biking", "Speed_NR"),
+    Bkg_Cadence.dens = density_fun(Cadence, "biking", "Cadence"),
+    Bkg_multi.dens = Bkg_HR.dens * Bkg_Speed_NR.den * Bkg_Cadence.dens
+  ) %>%
+  mutate(
+    Drvg_HR.dens = density_fun(HR, "driving", "HR"),
+    Drvg_Speed_NR.den = density_fun(Speed_NR, "driving", "Speed_NR"),
+    Drvg_Cadence.dens = density_fun(Cadence, "driving", "Cadence"),
+    Drvg_multi.dens = Drvg_HR.dens * Drvg_Speed_NR.den * Drvg_Cadence.dens
+  ) %>%
+  mutate(
+    max_ind = pmap_int(list(
+      Offc_multi.dens, Wlkg_multi.dens, Rnng_multi.dens, Bkg_multi.dens,
+      Drvg_multi.dens
+    ), ~ which.max(c(...))),
+    winner1 = if_else(max_ind == 1, "winner", "loser"),
+    winner2 = if_else(max_ind == 2, "winner", "loser"),
+    winner3 = if_else(max_ind == 3, "winner", "loser"),
+    winner4 = if_else(max_ind == 4, "winner", "loser"),
+    winner5 = if_else(max_ind == 5, "winner", "loser")
+  )
+
+
+
+all.df_extented_2$max_ind <- as.factor(all.df_extented_2$max_ind)
+
+levels(all.df_extented_2$max_ind) <- c("office_work", "walking", "running", "biking", "driving")
+
+activity_names <- c(
+  `office_work` = "Office Work",
+  `walking` = "Walking",
+  `running` = "Running",
+  `biking` = "Biking",
+  `driving` = "Driving"
+)
+
+# Convert time to the series
+all.df_extented_2$Time <- as.numeric(all.df_extented_2$Time)
+# Convert time to the POSIXct
+all.df_extented_2$Time2 <- as.POSIXct(all.df$Time, format = "%H:%M:%S")
+
+
+```
+
+
+
+
+------------------------------------------------------------------------
+\newpage
+
+
+```{r include=FALSE}
+# Read the data frames
+
+all.df_dataset1 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset1.csv"), stringsAsFactors = T)
+all.df_dataset2 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset2.csv"), stringsAsFactors = T)
+
+all.df2 = rbind(all.df_dataset1, all.df_dataset2)
+
+
+str(all.df2)
+
+#head(all.df2,5)
+
+
+all.df2$Time = as.POSIXct(all.df2$Time, format = "%Y-%m-%d %H:%M:%S")
+str(all.df2)
+
+unique(all.df2$ID)
+```
+
+
+
+```{r include=FALSE}
+
+all.df2.HR.NAs = all.df2[is.na(all.df2$HR),]
+nrow(all.df2[is.na(all.df2$HR),])
+# remove all NAs
+#all.df2 = all.df2[!is.na(all.df2$HR),]
+nrow(all.df2[is.na(all.df2$HR),])
+
+all.df2.Speed.NAs = all.df2[is.na(all.df2$Speed),]
+nrow(all.df2.Speed.NAs)
+all.df2.Cadence.NAs = all.df2[is.na(all.df2$Cadence),]
+nrow(all.df2.Speed.NAs)
+
+# check if all HR [40,200]
+#all.df2$HR[(all.df2$HR <= 40 | all.df2$HR >= 200)] <- NA
+
+
+```
+
+
+```{r include=FALSE}
+unique(all.df2$ID)
+all.df_extented_3 <- all.df2 %>%
+  filter(ID == "T009") %>%
+  #group_by(ID) %>%
+  mutate(Offc_HR.dens = density_fun_HR_office_work(HR),
+         Offc_Speed_NR.den = density_fun_Speed_office_work(Speed_NR),
+         Offc_Cadence.dens = density_fun_Cadence_office_work(Cadence)
+         ) %>%
+  
+  mutate(Wlkg_HR.dens = density_fun_HR_walking(HR),
+         Wlkg_Speed_NR.den = density_fun_Speed_walking(Speed_NR),
+         Wlkg_Cadence.dens = density_fun_Cadence_walking(Cadence)
+         ) %>%
+  
+  mutate(Rnng_HR.dens = density_fun_HR_running(HR),
+         Rnng_Speed_NR.den = density_fun_Speed_running(Speed_NR),
+         Rnng_Cadence.dens = density_fun_Cadence_running(Cadence) 
+         ) %>%
+  
+  mutate(Bkg_HR.dens = density_fun_HR_biking(HR),
+         Bkg_Speed_NR.den = density_fun_Speed_biking(Speed_NR),
+         Bkg_Cadence.dens = density_fun_Cadence_biking(Cadence)
+         )%>%
+  
+  mutate(Drvg_HR.dens = density_fun_HR_driving(HR),
+         Drvg_Speed_NR.den = density_fun_Speed_driving(Speed_NR),
+         Drvg_Cadence.dens = density_fun_Cadence_driving(Cadence)
+         ) %>%
+  mutate( Offc_multi.dens = Offc_HR.dens * Offc_Speed_NR.den * Offc_Cadence.dens,
+          Wlkg_multi.dens = Wlkg_HR.dens * Wlkg_Speed_NR.den * Wlkg_Cadence.dens ,
+          Rnng_multi.dens = Rnng_HR.dens * Rnng_Speed_NR.den * Rnng_Cadence.dens ,
+          Bkg_multi.dens = Bkg_HR.dens * Bkg_Speed_NR.den * Bkg_Cadence.dens,
+          Drvg_multi.dens = Drvg_HR.dens * Drvg_Speed_NR.den * Drvg_Cadence.dens
+  )
+```
+
+
+```{r include=FALSE}
+
+# replace NA with 0 in probability products values. 
+# replace values less than 0.000001 with 0
+all.df_extented_3[,c(15:29)] %>%
+  replace(., is.na(.), 0) -> all.df_extented_3[,c(15:29)]
+
+all.df_extented_3[,c(15:29)] %>%
+  replace(., .<0.000001, 0) -> all.df_extented_3[,c(15:29)]
+
+
+# replace NA with 0 in probability products values.
+#str(all.df_extented_3)
+all.df_extented_3 = all.df_extented_3 %>%
+  mutate_at(vars(Offc_multi.dens,Wlkg_multi.dens, Rnng_multi.dens,Bkg_multi.dens,Drvg_multi.dens), ~replace_na(., 0))
+
+
+# find the max value in each row
+all.df_extented_3$max_indVal <- apply(all.df_extented_3[,c("Offc_multi.dens","Wlkg_multi.dens",
+                                                      "Rnng_multi.dens", "Bkg_multi.dens",
+                                                        "Drvg_multi.dens")], 1, max)
+
+
+# find the column name of the max value in each row if not all of them are zero
+all.df_extented_3 %>%
+  mutate(max_ind = pmap_dbl(list(Offc_multi.dens,Wlkg_multi.dens, Rnng_multi.dens,Bkg_multi.dens,
+                                 Drvg_multi.dens), ~which.max(c(...))),
+         winner1 = if_else(max_indVal ==0,"zero", if_else(max_ind == 1, "winner", "loser")),
+         winner2 = if_else(max_indVal ==0,"zero", if_else(max_ind == 2, "winner", "loser")),
+         winner3 = if_else(max_indVal ==0,"zero", if_else(max_ind == 3, "winner", "loser")),
+         winner4 = if_else(max_indVal ==0,"zero", if_else(max_ind == 4, "winner", "loser")),
+         winner5 = if_else(max_indVal ==0,"zero", if_else(max_ind == 5, "winner", "loser")),
+  ) -> all.df_extented_3
+
+
+
+# if all products are zero (max_indVal = 0), then the max_ind should be zero 
+all.df_extented_3[all.df_extented_3$max_indVal == 0,]$max_ind <- 0
+                 
+all.df_extented_3$max_ind <- as.factor(all.df_extented_3$max_ind)
+#factor(all.df_extented_3$max_ind)
+
+# recode the factor
+all.df_extented_3$max_ind <- recode_factor(all.df_extented_3$max_ind, 
+                                           `0` = "zero", `1` = "office_work",
+                                           `2` = "walking", `3` = "running", `4` = "biking",
+                                           `5` = "driving")
+
+
+# Convert time to the series
+all.df_extented_3$Time <- as.numeric( all.df_extented_3$Time)
+# Convert time to the POSIXct
+all.df_extented_3$Time2 = as.POSIXct(all.df_extented_3$Time, format = "%H:%M:%S")
+
+
+
+
+```
+
+# Q1  unpaired t-test
+
+
+```{r}
+
+DC_df_mean = all.df2 %>%
+  filter(Day == "DC1" | Day == "DC2"  | Day == "DC3") %>%
+  group_by(ID, Day)
+
+```
+
+```{r echo=FALSE}
+
+
+mis_HR = DC_df_mean[DC_df_mean$Day == "DC2",]$HR
+non_HR  = DC_df_mean[DC_df_mean$Day != "DC2",]$HR
+
+
+pool.DC1_DC2<- t.test(mis_HR, non_HR, alternative= "two.sided")
+pool.DC1_DC2
+
+
+
+# H0 = The mean of HR in DC1 is not significantly different than the mean of HR in DC2
+# H1 = The mean of HR in DC1 is significantly different than the mean of HR in DC2
+
+```
+
+```{r echo=FALSE}
+boxplot(mis_HR, non_HR, main="Boxplot of HR in mission and non-mission", 
+        xlab="Day", ylab="HR", col=c("orange","lightblue"), names=c("mission", "non-mission"))
+```
+
+
+
+# Q2 - paired t-test
+
+```{r}
+
+DC_df_mean = all.df2 %>%
+  filter(Day == "DC1" | Day == "DC2"  | Day == "DC3") %>%
+  group_by(ID, Day)%>%
+  summarise(HR_mean=mean(HR,na.rm=T), 
+            Speed_mean=mean(Speed,na.rm=T), 
+            Cadence_mean=mean(Cadence,na.rm=T),
+            .groups = 'drop'
+            )
+
+
+
+
+
+
+# HR - mission vs non-mission
+mission_HR = DC_df_mean[DC_df_mean$Day == "DC2",]$HR_mean 
+premission_HR = DC_df_mean[DC_df_mean$Day == "DC1",]$HR_mean
+postmission_HR = DC_df_mean[DC_df_mean$Day == "DC3",]$HR_mean
+
+missions_HR = c(mission_HR,mission_HR)
+non_missions_HR = c(premission_HR, postmission_HR)
+
+mis_nonMis_HR <- t.test(missions_HR, non_missions_HR, alternative="two.sided",paired = T)
+
+diff_HR = missions_HR - non_missions_HR
+
+```
+
+
+```{r}
+boxplot(diff_HR, main="Boxplot of HR difference between mission and non-mission", xlab="Day", ylab="HR difference", col=c("steelblue"))
+
+
+
+```
+
+
+## Q2 - Paired test results
+
+```{r echo=FALSE}
+mis_nonMis_HR
+
+```
+
+
+```{r echo=FALSE}
+pairedDF <- data.frame(
+  "Activity" = c("HR"),
+  "pre_mis_p" = c(mis_nonMis_HR$p.value),
+  "df" = c(mis_nonMis_HR$parameter),
+  "CI" = c(paste0 (round(mis_nonMis_HR$conf.int[[1]],3), " - ", round(mis_nonMis_HR$conf.int[[2]],3))
+          )
+  
+)
+
+# if CI has -inf, replace it with symbol of infinity
+#pairedDF$CI[pairedDF$CI == "-Inf - Inf"] <- "(-Inf - Inf)"
+
+# add p-value for paired t-test
+
+```
+
+```{r}
+pairedDF %>%
+  kable("latex", booktabs = T, caption = "Paired t-test", digits = 3) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), font_size = 8)
+
+```
+
+
+
+
+# Q3 - Plots and Proportion test
+
+
+```{r echo=FALSE, fig.height=11, fig.width=20, message=FALSE, warning=FALSE}
+require(ggpmisc) # require(ggpmisc) # for stat_correlation()
+
+# without x axis label first rows
+my_theme <- theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    strip.text = element_text(size = 18),
+    legend.position = "none"
+  )
+
+# with  x-y axis label
+my_theme1 <- theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(size = 8, face = "bold"),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    strip.text = element_text(size = 18),
+    legend.position = "none"
+  )
+
+
+  activity_names <- c(
+    `office_work` = "Office Work",
+    `walking` = "Walking",
+    `running` = "Running",
+    `biking` = "Biking",
+    `driving` = "Driving"
+  )
+  
+
+  mycolors <- c(zero = "white",office_work = "darkgray", walking = "darkolivegreen",
+                running = "deepskyblue",  biking = "orange",
+                driving = "deeppink3")
+
+  
+  
+  # Raw Signals - 5x3 matrix - Face Wrap ----
+
+  
+  my.alpha <-  0.7
+  
+  P1_HR <- all.df_extented_3 %>%
+    arrange(Time2) %>% 
+    mutate(gap = cumsum(c(0, diff(Time2) > 2))) %>%
+    #group_by(Activity) %>%
+    #filter(Activity == tmp_activity) %>% 
+    ggplot(aes(x=Time2, y = HR, group = Day)) +
+    facet_wrap(Day~., scales = 'free',
+               strip.position = "left", nrow =4, ncol = 1,
+               #labeller = as_labeller( activity_names)
+               )+
+    geom_rect(aes(xmin = Time2,
+                  xmax = dplyr::lead(Time2),
+                  ymin = 0, ymax = Inf,
+                  fill = max_ind), alpha = my.alpha) +
+    geom_line( color = "red", linewidth = 0.5) +
+    #scale_x_datetime(date_breaks = "60 min", date_labels = "%H:%M") +
+    scale_x_datetime(date_breaks = "1 hour", date_labels = "%H") +
+    #scale_x_datetime(labels=date_format("%y")) +
+    labs(title = "HR [BPM]",  x ="time [hour]", y ="") +
+    scale_fill_manual(values = alpha(mycolors, 1),"", drop = FALSE)  +# legend title = ""
+    #scale_fill_manual(values = alpha(mycolors, labels=c("Loser","Winner"), 2),drop = FALSE)+
+    my_theme1 + theme(
+      strip.background = element_blank(),
+      #strip.text.x = element_blank(),
+      strip.placement = "outside")+
+    #strip.text = element_text(face = "italic") )  +
+    stat_correlation(mapping = use_label(c("n")),label.x = "center")#(c("R", "t", "P", "n")))
+  
+  
+  
+
+  figure <- ggarrange(P1_HR, ncol = 1, nrow = 1, common.legend = TRUE, legend = "top") +
+          guides(col = guide_legend(ncol = 6))
+  
+  
+  
+  title.text= paste0("Activity Classification of T009 HR")
+  
+  final_ann_figure =  annotate_figure(figure, 
+                                      top = text_grob(title.text,color = "red", face = "bold", size = 14)
+                                      ) 
+  
+  print(final_ann_figure)
+  
+  ggsave("T009_HR.jpg", P1_HR, width = 20, height = 11, units = "in", dpi = 300)
+
+  
+  
+  
+```
+
+
+\newpage
+# Q3 - proportion test
+
+```{r echo=FALSE}
+
+
+proportion_mission = all.df_extented_3 %>%
+  filter(Day == "DC2") %>%
+  filter(max_ind != "zero" ) %>% # remove zero
+  group_by(Day,max_ind) %>%
+  summarise(n = n()) %>%
+  mutate(prop = n/sum(n)) %>%
+  mutate(prop = round(prop, 2)) %>%
+  select(Day,max_ind, n, prop)
+
+
+proportion_nonMission = all.df_extented_3 %>%
+  filter(Day == "DC1"  | Day == "DC3") %>%
+  filter(max_ind != "zero" ) %>% # remove zero
+  group_by(max_ind) %>%
+  summarise(n = n()) %>%
+  mutate(prop = n/sum(n)) %>%
+  mutate(prop = round(prop, 2)) %>%
+  select(max_ind, n, prop)
+
+
+
+
+
+
+
+
+```
+
+### 2-sample test for equality of proportions with continuity correction
+
+```{r echo=FALSE}
+
+# source: 
+browseURL("https://bookdown.org/logan_kelly/r_practice/p12.html")
+
+# test the proportion of office work in mission and non-mission days
+mission_prop = proportion_mission[proportion_mission$max_ind == "office_work",]$prop
+non_mission_prop = proportion_nonMission[proportion_nonMission$max_ind == "office_work",]$prop
+
+#?prop.test()
+
+
+
+prop.test(x = c(mission_prop*sum(proportion_mission$n), 
+                non_mission_prop*sum(proportion_nonMission$n)), 
+          
+          n = c(sum(proportion_mission$n),
+                sum(proportion_nonMission$n)))
+
+
+
+# we reject the null hypothesis that the proportion of office work is the same in the mission and non-mission days.
+
+```
+
+
+
+
