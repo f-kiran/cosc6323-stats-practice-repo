@@ -285,6 +285,7 @@ all.df_extented_2$Time2 <- as.POSIXct(all.df$Time, format = "%H:%M:%S")
 all.df_dataset1 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset1.csv"), stringsAsFactors = T)
 all.df_dataset2 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset2.csv"), stringsAsFactors = T)
 
+rm(all.df2)
 all.df2 = rbind(all.df_dataset1, all.df_dataset2)
 
 
@@ -312,7 +313,7 @@ nrow(all.df2[is.na(all.df2$HR),])
 all.df2.Speed.NAs = all.df2[is.na(all.df2$Speed),]
 nrow(all.df2.Speed.NAs)
 all.df2.Cadence.NAs = all.df2[is.na(all.df2$Cadence),]
-nrow(all.df2.Speed.NAs)
+nrow(all.df2.Cadence.NAs)
 
 # check if all HR [40,200]
 #all.df2$HR[(all.df2$HR <= 40 | all.df2$HR >= 200)] <- NA
@@ -324,7 +325,7 @@ nrow(all.df2.Speed.NAs)
 ```{r include=FALSE}
 unique(all.df2$ID)
 all.df_extented_3 <- all.df2 %>%
-  filter(ID == "T009") %>%
+  #filter(ID == "T009") %>%
   #group_by(ID) %>%
   mutate(Offc_HR.dens = density_fun_HR_office_work(HR),
          Offc_Speed_NR.den = density_fun_Speed_office_work(Speed_NR),
@@ -578,15 +579,16 @@ my_theme1 <- theme_bw() +
   
   my.alpha <-  0.7
   
+  #unique(all.df_extented_3$ID)
   P1_HR <- all.df_extented_3 %>%
+    filter(ID == "T009") %>%
     arrange(Time2) %>% 
-    mutate(gap = cumsum(c(0, diff(Time2) > 2))) %>%
-    #group_by(Activity) %>%
-    #filter(Activity == tmp_activity) %>% 
+    #mutate(gap = cumsum(c(0, diff(Time2) > 2))) %>%
+    
     ggplot(aes(x=Time2, y = HR, group = Day)) +
     facet_wrap(Day~., scales = 'free',
                strip.position = "left", nrow =4, ncol = 1,
-               #labeller = as_labeller( activity_names)
+
                )+
     geom_rect(aes(xmin = Time2,
                   xmax = dplyr::lead(Time2),
@@ -638,7 +640,7 @@ my_theme1 <- theme_bw() +
 
 proportion_mission = all.df_extented_3 %>%
   filter(Day == "DC2") %>%
-  filter(max_ind != "zero" ) %>% # remove zero
+  #filter(max_ind != "zero" ) %>% # remove zero
   group_by(Day,max_ind) %>%
   summarise(n = n()) %>%
   mutate(prop = n/sum(n)) %>%
@@ -669,7 +671,7 @@ proportion_nonMission = all.df_extented_3 %>%
 ```{r echo=FALSE}
 
 # source: 
-browseURL("https://bookdown.org/logan_kelly/r_practice/p12.html")
+#browseURL("https://bookdown.org/logan_kelly/r_practice/p12.html")
 
 # test the proportion of office work in mission and non-mission days
 mission_prop = proportion_mission[proportion_mission$max_ind == "office_work",]$prop
