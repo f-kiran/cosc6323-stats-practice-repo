@@ -24,7 +24,6 @@ library(lme4)
 library(readr)
 library(lmerTest)
 library(lattice)
-# library(MASS)
 library(gridExtra)
 library(kableExtra)
 library(BSDA) # for z.test
@@ -40,6 +39,14 @@ getwd()
 ```
 
 
+# The template for homework
+***Summary Statistics***
+***Data Visualization***
+***Check for Outliers (no extreme outliers found)***
+***Test - ANOVA***
+***Post-hoc Tests***
+***Visualization of Full Analysis***
+       
 ```{r include=FALSE}
 # Read the data frames
 
@@ -49,7 +56,6 @@ all.df_dataset1 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Data
 all.df_dataset2 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset2_new.csv"), stringsAsFactors = T)
 
 all.df2 = rbind(all.df_dataset1, all.df_dataset2)
-
 
 str(all.df2)
 
@@ -67,21 +73,16 @@ nrow(all.df2[is.na(all.df2$HR),])
 all.df2 = all.df2[!is.na(all.df2$HR),]
 nrow(all.df2[is.na(all.df2$HR),])
 
-all.df2.Speed.NAs = all.df2[is.na(all.df2$Speed),]
-nrow(all.df2.Speed.NAs)
-all.df2.Cadence.NAs = all.df2[is.na(all.df2$Cadence),]
-nrow(all.df2.Speed.NAs)
 
-# check if all HR [40,200]
-#all.df2$HR[(all.df2$HR <= 40 | all.df2$HR >= 200)] <- NA
 
 
 ```
 
-# Sample 400 from each day
+# 400 Sample from each day
 
 
 ```{r}
+# Lets start with the data we're familiar with
 # from HW4
 DC_df = all.df2 %>%
   select(ID, Day, HR, Speed_NR, Cadence) %>%
@@ -103,11 +104,10 @@ DC_recovery_df = all.df2 %>%
 
 # HR normality test
 
-# Shapiro-Wilk test
+# Shapiro-Wilk test for normality
 HR_m_N400 = shapiro.test(DC_df$HR[DC_df$Day == "DC2"])
 HR_nm_N400 = shapiro.test(DC_df$HR[DC_df$Day != "DC2"])
 HR_re_N400 = shapiro.test(DC_recovery_df$HR)
-
 
 HR_m_N400
 HR_nm_N400
@@ -119,9 +119,6 @@ HR_re_N400
 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-#all.df_extented_3$ID
-#all.df_extented_3$Day
-library(rstatix)
 
 mis = DC_df[DC_df$Day == "DC2",]
 non  = DC_df[DC_df$Day != "DC2",]
@@ -145,7 +142,7 @@ data$Day = droplevels(data$Day)
 
 levels(data$Day) <-  c("non-mission", "mission", "recovery")
 
-#str(data)
+str(data)
 
 ```
 
@@ -153,6 +150,8 @@ levels(data$Day) <-  c("non-mission", "mission", "recovery")
 ## ANOVA HR
 
 ```{r echo=TRUE}
+
+library(rstatix) # 
 #Summary Statistics
 data %>%
   group_by(Day) %>%
@@ -162,7 +161,7 @@ data %>%
 
 data %>%
   group_by(Day) %>%
-  ggboxplot( x = "Day", y = "HR")
+  ggboxplot( x = "Day", y = "HR") 
 
 #Check for Outliers (no extreme outliers found)
 data %>%
@@ -170,9 +169,15 @@ data %>%
   identify_outliers(HR)
 
 
-#ANOVA
+?anova_test()
+
+# Independent measures ANOVA:
+
 result.aov_HR <- anova_test(HR ~ Day, data = data)
 result.aov_HR
+
+# H0: The means of the groups are equal
+# H1: At least one group mean is different
 
 # Now we can see that the p-value is less than 0.05, so we can reject the null hypothesis and conclude that there is a significant difference between the groups.
 
@@ -194,10 +199,15 @@ ggboxplot(data, x = "Day", y = "HR") +
 
 
 
+What is the issue here with samples?
 
+The issue here is that data is not normally distributed. 
 
+The p-value of the Shapiro-Wilk test is less than 0.05, so we can reject the null hypothesis and conclude that the data is not normally distributed. This is a problem because the ANOVA test assumes that the data is normally distributed.
 
+What we'll try to make the data normally distributed is to take the log of the data and then run the ANOVA test again.
 
+What is the best way to handle this issue?
 
 
 \newpage
@@ -240,12 +250,10 @@ mission_df_mean <- DC_df_summary %>%
 recovery_df_mean <- DC_df_summary %>%
   filter(Day == "DC4") 
 
-
 ```
 
 # HR normality test
 ```{r include=FALSE}
-
 
 # Shapiro-Wilk test
 HR_m = shapiro.test(mission_df_mean$HR)
@@ -260,9 +268,8 @@ HR_re
 
 
 ```{r fig.height=7, fig.width=7, message=FALSE, warning=FALSE, include=FALSE}
-## Qq Plots wiht Samples
+## Qq Plots with Samples
 
-  
 #table(DC_df$Day)
 
 my_theme <- theme_bw() +
@@ -366,7 +373,6 @@ rec_bn_HR_nt= shapiro.test(rec_bn_HR$x.t)
 mis_bn_HR_nt
 non_bn_HR_nt
 rec_bn_HR_nt
-
 ```
 
 
