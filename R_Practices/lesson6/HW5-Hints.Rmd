@@ -1,0 +1,626 @@
+---
+title: "HW5 Hints "
+author: "COSC6323/Spring 2024"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    keep_tex: true
+    toc: true
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+library(lme4)
+library(readr)
+library(lmerTest)
+library(lattice)
+# library(MASS)
+library(gridExtra)
+library(kableExtra)
+library(BSDA) # for z.test
+library("car") # QQplot
+require(ggpmisc) # for stat_poly_eq
+```
+
+```{r include=FALSE}
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+
+```{r include=FALSE}
+# Read the data frames
+
+all.df_dataset1 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset1.csv"), stringsAsFactors = T)
+#all.df_dataset2 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset2.csv"), stringsAsFactors = T)
+
+all.df_dataset2 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset2_new.csv"), stringsAsFactors = T)
+
+all.df2 = rbind(all.df_dataset1, all.df_dataset2)
+
+
+str(all.df2)
+
+droplevels(all.df2)
+str(all.df2)
+
+all.df2$Time = as.POSIXct(all.df2$Time, format = "%Y-%m-%d %H:%M:%S")
+str(all.df2)
+
+unique(all.df2$ID)
+
+all.df2.HR.NAs = all.df2[is.na(all.df2$HR),]
+nrow(all.df2[is.na(all.df2$HR),])
+# remove all NAs
+all.df2 = all.df2[!is.na(all.df2$HR),]
+nrow(all.df2[is.na(all.df2$HR),])
+
+all.df2.Speed.NAs = all.df2[is.na(all.df2$Speed),]
+nrow(all.df2.Speed.NAs)
+all.df2.Cadence.NAs = all.df2[is.na(all.df2$Cadence),]
+nrow(all.df2.Speed.NAs)
+
+# check if all HR [40,200]
+#all.df2$HR[(all.df2$HR <= 40 | all.df2$HR >= 200)] <- NA
+
+
+```
+
+# Sample 400 from each day
+
+
+```{r}
+# from HW4
+DC_df = all.df2 %>%
+  select(ID, Day, HR, Speed_NR, Cadence) %>%
+  filter(Day == "DC1" | Day == "DC2"  | Day == "DC3") %>%
+  group_by(ID, Day) %>%
+  sample_n(400)
+
+DC_recovery_df = all.df2 %>%
+  select(ID, Day, HR, Speed_NR, Cadence) %>%
+  filter(Day == "DC4") %>%
+  group_by(ID, Day) %>%
+  sample_n(400)
+
+
+```
+
+
+```{r include=FALSE}
+
+# HR normality test
+
+# Shapiro-Wilk test
+HR_m_N400 = shapiro.test(DC_df$HR[DC_df$Day == "DC2"])
+HR_nm_N400 = shapiro.test(DC_df$HR[DC_df$Day != "DC2"])
+HR_re_N400 = shapiro.test(DC_recovery_df$HR)
+
+
+HR_m_N400
+HR_nm_N400
+HR_re_N400
+
+
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#all.df_extented_3$ID
+#all.df_extented_3$Day
+library(rstatix)
+
+mis = DC_df[DC_df$Day == "DC2",]
+non  = DC_df[DC_df$Day != "DC2",]
+rec = DC_recovery_df
+  
+
+data = data.frame(Day = c(mis$Day,mis$Day, non$Day, rec$Day,rec$Day),
+                  HR = c(mis$HR,mis$HR, non$HR, rec$HR,rec$HR),
+                  Speed = c(mis$Speed_NR,mis$Speed_NR, non$Speed_NR, rec$Speed_NR,rec$Speed_NR),
+                  Cadence = c(mis$Cadence,mis$Cadence, non$Cadence, rec$Cadence,rec$Cadence)
+                  )
+
+#rename the levels of Day on the data frame
+
+#replace Day == "DC3" with "DC1"
+
+data %>%
+  mutate(Day = replace(Day, Day == "DC3", "DC1")) -> data
+
+data$Day = droplevels(data$Day)
+
+levels(data$Day) <-  c("non-mission", "mission", "recovery")
+
+#str(data)
+
+```
+
+\newpage
+## ANOVA HR
+
+```{r echo=TRUE}
+#Summary Statistics
+data %>%
+  group_by(Day) %>%
+  get_summary_stats(HR) 
+
+#Data Visualization
+
+data %>%
+  group_by(Day) %>%
+  ggboxplot( x = "Day", y = "HR")
+
+#Check for Outliers (no extreme outliers found)
+data %>%
+  group_by(Day) %>%
+  identify_outliers(HR)
+
+
+#ANOVA
+result.aov_HR <- anova_test(HR ~ Day, data = data)
+result.aov_HR
+
+# Now we can see that the p-value is less than 0.05, so we can reject the null hypothesis and conclude that there is a significant difference between the groups.
+
+# Then run a post-hoc test to determine which groups are different from each other.
+
+#Post-hoc Tests
+OWA_pwc_HR <- data %>% tukey_hsd(HR ~ Day)
+OWA_pwc_HR
+
+#Visualization of Full Analysis
+OWA_pwc_HR <- OWA_pwc_HR %>% add_xy_position(x = "Day")
+ggboxplot(data, x = "Day", y = "HR") +
+  stat_pvalue_manual(OWA_pwc_HR, hide.ns = T) +
+  labs(subtitle = get_test_label(result.aov_HR, detailed = TRUE),
+       caption = get_pwc_label(OWA_pwc_HR))
+
+
+```
+
+
+
+
+
+
+
+
+
+\newpage
+# Q1 - Normality test and Q-Q Plots with Means
+
+```{r message=FALSE, warning=FALSE}
+
+DC_df = all.df2 %>%
+  group_by(ID, Day) %>%
+  mutate(Period = ifelse(hour(Time) < 12, "Morning", "Afternoon"))
+  
+
+DC_df %>%
+  group_by(ID, Day, Period) %>%
+  summarise(n = n(),
+            HR = mean(HR, na.rm = T),
+            Speed_NR = mean(Speed_NR, na.rm = T),
+            Cadence = mean(Cadence, na.rm = T),
+            .groups = 'drop') -> DC_df_summary
+
+DC_df_summary = DC_df_summary[!is.na(DC_df_summary$Period),]
+
+
+nonmission_df_mean <- DC_df_summary %>%
+  filter(Day == "DC1" | Day == "DC3") %>%
+  group_by(ID,Period) %>%
+  summarise(n = n(),
+            Day = "DNM",
+            HR = mean(HR, na.rm = T),
+            Speed_NR = mean(Speed_NR, na.rm = T),
+            Cadence = mean(Cadence, na.rm = T),
+            .groups = 'drop') 
+
+nonmission_df_mean$Day = factor(nonmission_df_mean$Day)
+#str(nonmission_df_mean)
+  
+mission_df_mean <- DC_df_summary %>%
+  filter(Day == "DC2") 
+
+recovery_df_mean <- DC_df_summary %>%
+  filter(Day == "DC4") 
+
+
+```
+
+# HR normality test
+```{r include=FALSE}
+
+
+# Shapiro-Wilk test
+HR_m = shapiro.test(mission_df_mean$HR)
+HR_nm = shapiro.test(nonmission_df_mean$HR)
+HR_re = shapiro.test(recovery_df_mean$HR)
+
+HR_m
+HR_nm
+HR_re
+
+```
+
+
+```{r fig.height=7, fig.width=7, message=FALSE, warning=FALSE, include=FALSE}
+## Qq Plots wiht Samples
+
+  
+#table(DC_df$Day)
+
+my_theme <- theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    strip.text = element_text(size = 18),
+    legend.position = "none"
+  )
+
+
+text_size <- 3
+# HR
+rm(P11)
+
+
+P11 <- mission_df_mean %>%
+  ggplot(aes(sample = HR)) +
+  geom_qq() +
+  stat_qq_line(color = "red") +
+  labs(title="Mission Day", y="HR" , x = "" ) + 
+  my_theme +
+  geom_text( aes(1, 90, label = paste0("italic(n) == ", nrow(mission_df_mean))),
+              parse = TRUE, 
+              vjust = -2.5, hjust = 2, 
+              size = text_size) 
+
+
+
+P12 <- nonmission_df_mean %>%
+  ggplot(aes(sample = HR)) +
+  geom_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "Non-mission Days", y="" , x = "" )  + 
+  my_theme + # theme(axis.text.y = element_blank(),
+               #   axis.ticks.y = element_blank())+   
+  geom_text( aes(1, 90, label = paste0("italic(n) == ",  nrow(mission_df_mean))),
+              parse = TRUE, 
+              vjust = -2.5, hjust = 2, 
+              size = text_size) 
+
+P13 <- recovery_df_mean %>%
+  ggplot(aes(sample = HR)) +
+  geom_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "Recovery Day", y="" , x = "" )  + 
+  my_theme + # theme(axis.text.y = element_blank(),
+               #   axis.ticks.y = element_blank())+   
+  geom_text( aes(1, 90, label = paste0("italic(n) == ",  nrow(mission_df_mean))),
+              parse = TRUE, 
+              vjust = -2.5, hjust = 2, 
+              size = text_size)
+
+
+
+
+# arrange the plots
+final = ggarrange(P11, P12, P13, ncol = 3, nrow = 1)
+
+
+
+```
+
+```{r echo=FALSE, fig.height=7, fig.width=7, message=FALSE, warning=FALSE}
+print(final)
+```
+
+\newpage
+
+## Normality Check with **bestNormalize** library on
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#install.packages('bestNormalize')
+library(bestNormalize)
+
+
+mis = mission_df_mean
+non  = nonmission_df_mean
+rec = recovery_df_mean
+
+
+# HR
+mis_bn_HR <- bestNormalize(mis$HR, loo = TRUE)
+mis_bn_HR_nt= shapiro.test(mis_bn_HR$x.t)
+
+non_bn_HR <- bestNormalize(non$HR, loo = TRUE)
+non_bn_HR_nt= shapiro.test(non_bn_HR$x.t)
+
+rec_bn_HR <- bestNormalize(rec$HR, loo = TRUE)
+rec_bn_HR_nt= shapiro.test(rec_bn_HR$x.t)
+
+
+```
+
+## The best optimally transformed values
+
+```{r echo=FALSE}
+mis_bn_HR_nt
+non_bn_HR_nt
+rec_bn_HR_nt
+
+```
+
+
+
+
+## Box plots on sample
+
+```{r echo=FALSE, fig.height=8.5, fig.width=8.5, message=FALSE, warning=FALSE}
+
+my_theme <- theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    #axis.text.y = element_blank(),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    strip.text = element_text(size = 18),
+    legend.position = "none"
+  )
+
+
+text_size <- 3
+
+# HR
+rm(P11)
+P11 <- mission_df_mean %>%
+  ggplot() + 
+  #geom_boxplot(aes(x = Day, y = HR), fill = "orange") + 
+  geom_boxplot(aes(y = HR), fill = "orange") + 
+  labs(title="Mission Day", y="HR" , x = "" ) + 
+  my_theme +   ylim(40, 120)    +
+  geom_text(aes(0, mean(mission_df_mean$HR), label = paste0("italic(n) == ",nrow(mission_df_mean))),
+              parse = TRUE, 
+              vjust = -3.5, hjust = 1.5, 
+              size = text_size) 
+  
+#P11
+
+P12 <- nonmission_df_mean %>%
+  ggplot() + 
+  geom_boxplot(aes(y = HR), fill = "lightblue") + 
+  labs(title = "Non-mission Days", y="" , x = "" )  + 
+  my_theme + theme(axis.text.y = element_blank(),
+                  axis.ticks.y = element_blank())+   
+  ylim(40, 120) +  
+  geom_text(aes(0, mean(nonmission_df_mean$HR), label = paste0("italic(n) == ", nrow(nonmission_df_mean))),
+          parse = TRUE, 
+              vjust = -3.5, hjust = 1.5, 
+              size = text_size) 
+  
+#P12
+
+P13 <- recovery_df_mean %>%
+  ggplot() + 
+  geom_boxplot(aes(y = HR), fill = "lightgreen") + 
+  labs(title = "Recovery Day", y="" , x = "" )  + 
+  my_theme + theme(axis.text.y = element_blank(),
+                  axis.ticks.y = element_blank())+   
+  ylim(40, 120) +  
+  geom_text( aes(0, mean(recovery_df_mean$HR), label = paste0("italic(n) == ", nrow(recovery_df_mean))),
+          parse = TRUE, vjust = -3.5, hjust = 1.5, size = text_size) 
+
+
+```
+
+```{r echo=FALSE, fig.height=8.5, fig.width=8.5, message=FALSE, warning=FALSE}
+
+# arrange the plots
+ggarrange(P11, P12, P13,
+          ncol = 3, nrow = 1)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#all.df_extented_3$ID
+#all.df_extented_3$Day
+library(rstatix)
+
+
+
+mis = mission_df_mean
+non  = nonmission_df_mean
+rec = recovery_df_mean
+  
+
+data = data.frame(ID = c(mis$ID, non$ID, rec$ID),
+                  Period = c(mis$Period, non$Period, rec$Period),
+                  Day = c(mis$Day, non$Day, rec$Day),
+                  HR = c(mis$HR, non$HR, rec$HR)
+                  )
+
+
+str(data)
+#rename the levels of Day on the data frame
+
+data$ID = factor(data$ID)
+data$Period = factor(data$Period)
+
+
+levels(data$Day)
+
+#!!!! important to drop the levels before renaming!
+data$Day = droplevels(data$Day)
+
+levels(data$Day)
+
+levels(data$Day) <-  c("mission", "recovery", "non_mission")
+
+str(data)
+
+```
+
+\newpage
+## ANOVA HR
+
+```{r echo=TRUE}
+#Summary Statistics
+data %>%
+  group_by(Day) %>%
+  get_summary_stats(HR) 
+
+
+#Data Visualization
+
+data %>%
+  group_by(Day) %>%
+  ggboxplot( x = "Day", y = "HR") 
+
+#Check for Outliers (no extreme outliers found)
+data %>%
+  group_by(Day) %>%
+  identify_outliers(HR)
+
+
+#ANOVA
+result.aov_HR <- anova_test(HR ~ Day, data = data)
+result.aov_HR
+
+# result.aov_HR <- anova_test(HR ~ Period, data = data)
+# result.aov_HR
+
+
+# There is no differences between the groups (p = 0.05),
+# no need to perform post-hoc tests to see which one is bigger :)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+\newpage
+
+# Q2 -Repeated measures ANOVA: within-Subjects designs
+
+
+## QQ-Plot
+
+```{r echo=TRUE}
+ggqqplot(data, "HR", facet.by = "Day", title = "QQ-Plot of HR") + 
+  theme_cowplot() + theme(plot.title = element_text(hjust = 0.5))
+ #theme_classic()
+```
+
+
+```{r echo=TRUE}
+
+
+str(data)
+
+#Summary Statistics
+data %>%
+  group_by(Day, Period) %>%
+  get_summary_stats(HR) 
+
+
+
+#Data Visualization
+
+RM_bxp = data %>%
+  #group_by(Day, Period) %>%
+  group_by(Day) %>%
+  ggboxplot( x = "Period", y = "HR" , add = "point")
+
+RM_bxp
+
+
+#Check for Outliers (no extreme outliers found)
+data %>%
+  group_by(Day, Period) %>%
+  identify_outliers(HR)
+
+#ANOVA
+?anova_test()
+
+
+# 2  way to do it
+
+result.aov_HR <- data %>%
+  anova_test(dv = HR, wid = ID, within = c(Day, Period))
+
+
+# since Main effect of Day is not significant,
+# we can ignore the interaction between Day and Period
+# no need to perform post-hoc tests to see which one is bigger :)
+
+
+```
+
+```{r echo=TRUE}
+
+# BUT if you like
+
+#Post-hoc Tests
+RM_pwc_HR <- data %>% 
+  pairwise_t_test(
+    HR ~ Day, paired = TRUE,
+    p.adjust.method = "bonferroni"
+  )
+RM_pwc_HR
+
+#Visualization of Full Analysis
+RM_pwc_HR <- RM_pwc_HR %>% add_xy_position(x = "time")
+RM_bxp +
+  stat_pvalue_manual(RM_pwc_HR) +
+  labs(subtitle = get_test_label(result.aov_HR, detailed = TRUE),
+    caption = get_pwc_label(RM_pwc_HR)
+  )
+
+
+
+
+```
+
+# Testing
+```{r}
+
+data %>%
+  group_by(Day) %>%
+anova_test(dv = HR, wid = ID, within = Period)
+
+result.aov_HR <- anova_test(HR ~ Period, data = data)
+result.aov_HR
+
+```
+
+
+
+

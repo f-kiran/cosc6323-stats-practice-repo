@@ -112,6 +112,7 @@ H1 = "The mean sample HR of the biking activity is not equal to the mean HR of t
 # Biking
 # 10
 sigmax = sd(all.df$HR[all.df$Activity == "biking"])
+
 sigmax 
 ?z.test()
  
@@ -280,6 +281,7 @@ norm_data = rnorm(100, mean = 5, sd = 3)
 
 plot(density(norm_data))
 hist(norm_data)
+
 shapiro.test(norm_data)
 
 #H0 = "The data is normally distributed"
@@ -294,6 +296,8 @@ shapiro.test(norm_data)
 # Check for normality the Office Work, Walking, Running, Biking, and Driving data. 
 # Shapiro-Wilk test for normality HR
 shapiro.test(all.df$HR[all.df$Activity == "office_work"])
+hist(all.df$HR[all.df$Activity == "office_work"])
+# Walking
 shapiro.test(all.df$HR[all.df$Activity == "walking"])
 shapiro.test(all.df$HR[all.df$Activity == "running"])
 shapiro.test(all.df$HR[all.df$Activity == "biking"])
@@ -381,9 +385,15 @@ qqline(all.df$HR, col = "steelblue", lwd = 2)
 # normality plots for HR with ggplot
 library(ggplot2)
 
+myn = nrow(all.df)
+
+??table()
+
+table(all.df$Activity, all.df$HR)
+
 p1 <- ggplot(all.df,aes(sample = HR)) +
-    facet_wrap(Activity~., scales = 'free_y',
-             strip.position = "left", nrow =5, ncol = 1)+
+    # facet_wrap(Activity~., scales = 'free_y',
+    #          strip.position = "left", nrow =5, ncol = 1)+
   stat_qq() +
   stat_qq_line(color = "red") +
   labs(title = "HR", x = "", y = "Sample Quantiles") +
@@ -411,6 +421,7 @@ p1
 # Q3 - 
 
 ## One-Sample Chi-Squared Test on Variance
+
 ```{r}
 # Realistic Check on Variance: According to large scale studies, the standard deviation of HR in sitting adults is 14.5 BPM. Check if the Office Work HR data of the Multimodal_Activity_Dataset have standard deviation that significantly exceeds the 14.5 BPM benchmark. Justify your methodology and describe your insights.
 
@@ -452,6 +463,6 @@ data= all.df$HR[all.df$Activity == "office_work"]
 HR_Off_work = varTest(data, alternative = "greater", conf.level = 0.95, 
     sigma.squared = benchmark ^ 2, data.name = NULL)
 
-
+HR_Off_work
 ```
 
