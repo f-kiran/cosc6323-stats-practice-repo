@@ -40,12 +40,13 @@ getwd()
 
 
 # The template for homework
-***Summary Statistics***
-***Data Visualization***
-***Check for Outliers (no extreme outliers found)***
-***Test - ANOVA***
-***Post-hoc Tests***
-***Visualization of Full Analysis***
+
+***Summary Statistics*** \
+***Data Visualization*** \
+***Check for Outliers (no extreme outliers found)*** \
+***Test - ANOVA*** \
+***Post-hoc Tests*** \
+***Visualization of Full Analysis*** \
        
 ```{r include=FALSE}
 # Read the data frames
@@ -101,7 +102,7 @@ DC_recovery_df = all.df2 %>%
 
 
 ```{r include=FALSE}
-
+nrow(DC_df)
 # HR normality test
 
 # Shapiro-Wilk test for normality
@@ -137,6 +138,8 @@ data = data.frame(Day = c(mis$Day,mis$Day, non$Day, rec$Day,rec$Day),
 
 data %>%
   mutate(Day = replace(Day, Day == "DC3", "DC1")) -> data
+
+unique(data$Day)
 
 data$Day = droplevels(data$Day)
 
@@ -218,6 +221,7 @@ What is the best way to handle this issue?
 DC_df = all.df2 %>%
   group_by(ID, Day) %>%
   mutate(Period = ifelse(hour(Time) < 12, "Morning", "Afternoon"))
+str(DC_df)
   
 
 DC_df %>%
@@ -523,18 +527,9 @@ result.aov_HR
 
 
 
-
-
-
-
-
-
-
-
-
 \newpage
 
-# Q2 -Repeated measures ANOVA: within-Subjects designs
+# Q2 - Repeated measures ANOVA: within-Subjects designs
 
 
 ## QQ-Plot
@@ -582,6 +577,7 @@ data %>%
 result.aov_HR <- data %>%
   anova_test(dv = HR, wid = ID, within = c(Day, Period))
 
+result.aov_HR
 
 # since Main effect of Day is not significant,
 # we can ignore the interaction between Day and Period
@@ -617,13 +613,16 @@ RM_bxp +
 
 # Testing
 ```{r}
+#Q1- 
+result.aov_HR <- anova_test(HR ~ Period, data = data)
+result.aov_HR
 
+# Q2-
 data %>%
   group_by(Day) %>%
 anova_test(dv = HR, wid = ID, within = Period)
 
-result.aov_HR <- anova_test(HR ~ Period, data = data)
-result.aov_HR
+
 
 ```
 

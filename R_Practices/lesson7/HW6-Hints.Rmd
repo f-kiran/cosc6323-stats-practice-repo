@@ -1,0 +1,306 @@
+---
+title: "HW6 Hints "
+author: "COSC6323/Spring 2024"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    toc: true
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(latex2exp)
+library(cowplot)
+library(ggpubr)
+library(lme4)
+require(ggpmisc) # stat on plots with facets
+library(rstatix) # tests
+library(qqplotr)
+
+theme_set(theme_classic()) # set the theme to classic
+theme_update(plot.title = element_text(hjust = 0.5)) # center the title
+
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+
+```
+
+
+```{r include=FALSE}
+# Read the data frames
+all.df2 = read.csv("../data/Multimodal-Activity-Dataset.csv", stringsAsFactors = T)
+
+str(all.df2)
+
+unique(all.df2$ID)
+
+# Check for missing values
+colSums(is.na(all.df2))
+
+# Remove missing values
+# This is to important to remove missing values before performing any analysis
+# because the functions will remove them automatically and we will not be able to
+# know how many missing values were there in the data.
+
+all.df2 <- all.df2 %>% drop_na(HR, Cadence, Speed_NR)
+
+# Check for missing values
+colSums(is.na(all.df2))
+
+```
+
+\newpage
+
+# Inspect Data ----
+
+## Linearity ----
+
+```{r message=FALSE, warning=FALSE}
+bfrCD.plot <- all.df2 %>%
+  ggplot(aes(x = HR, y = Cadence)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "",
+       x = "HR",
+       y = "Cadence") +
+  stat_correlation(mapping = use_label(c("R", "t", "P", "n")),label.x = "right", )
+  
+bfrCD.plot
+
+
+```
+
+# Normality Check (Row data): 
+
+## Box Plots | QQplots ----
+
+```{r echo=TRUE}
+# Normality : Box Plots | QQplots ----
+
+n_fun <- function(x) {
+  return(data.frame(y = median(x) +30, label = paste0("~italic(n)", " == ", length(x))))
+}
+
+#Box Plots ----
+all.df2 %>%
+  select(HR, Cadence, ID) %>% 
+  gather(key = "variable", value = "value", -ID) %>%
+  mutate(n= n()) %>%
+  ggboxplot( x= "variable", y = "value", add = "point")+
+  labs(title = "", x = "", y = "") +
+  stat_summary( fun.data = n_fun, geom = "text", fun.y = median, angle =90,
+                parse= T, size = 3, vjust = -0.75, hjust = 0,
+                position = position_dodge(width = 0.75) )
+
+  
+## QQplots ----
+
+all.df2 %>%
+  select(HR, Cadence, ID) %>%
+  #distinct() %>%
+  mutate(n= n()) %>%
+  gather(key = "variable", value = "value", -ID , -n) %>%
+  ggqqplot("value", facet.by = "variable") +
+  #ggqqplot("value", facet.by = "variable", color = "ID") +
+  geom_text(aes(label = paste0("italic(n) ==  ", n)), 
+            x = 2, y = -2, parse = T, size = 2, bold = F) 
+```
+
+## Shapiro Test ----
+
+
+  
+```{r echo=TRUE}
+## Shapiro Test ----
+
+#Why do we do?
+#We did not inspect our data  before in regards to normality.
+
+all.df2 %>%
+  select(HR, Cadence, ID) %>%
+  sample_n(5000) %>%
+  shapiro_test(HR)
+
+all.df2 %>%
+  select(HR, Cadence, ID) %>%
+  sample_n(5000) %>%
+  shapiro_test(Cadence)
+
+```
+
+## Anova Test
+
+```{r echo=TRUE}
+# Anova Test ----
+result.aov<- all.df2 %>% anova_test(HR ~ Cadence)
+result.aov
+```
+
+# Regression diagnostics
+
+## Linear Regression ----
+
+```{r echo=TRUE, fig.height=7, fig.width=7}
+# Linear Regression Analysis ----
+
+# https://library.virginia.edu/data/articles/diagnostic-plots
+
+hr_cad.lm <- lm(HR ~ Cadence, data = all.df2)
+summary(hr_cad.lm)
+```
+\newpage
+
+## Fitted values and residuals ----
+
+```{r echo=TRUE, fig.height=7, fig.width=7}
+par(mfrow = c(2,2))
+plot(hr_cad.lm)
+
+par(mfrow = c(1,1))
+
+
+# plot(hr_cad.lm, which = 1) # residuals_plot 
+# plot(hr_cad.lm, which = 2) # qqplot
+# plot(hr_cad.lm, which = 3) # scale-location
+# plot(hr_cad.lm, which = 4) # cook's distance
+
+```
+
+```{r fig.height=5, fig.width=5, include=FALSE}
+
+# Fitted values and residuals ----
+
+
+
+# # plot regression  diagnostics plots in qqplot
+# ggplot(data = all.df2, aes(sample = residuals(hr_cad.lm))) +
+#   stat_qq_band(distribution = qnorm) +  # qqplotr 
+#   stat_qq_line(distribution = qnorm) +
+#   labs(title = "QQ Plot of Residuals",
+#        x = "Theoretical Quantiles",
+#        y = "Sample Quantiles") +
+#   theme_minimal()
+
+# plot regression  diagnostics plots in scale-location
+ggplot(data = all.df2, aes(fitted(hr_cad.lm), sqrt(abs(residuals(hr_cad.lm))))) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  labs(title = "Scale-Location Plot",
+       x = "Fitted values",
+       y = "sqrt(|Standardized Residuals|)") +
+  theme_minimal()
+
+# plot regression  diagnostics plots in residuals vs leverage
+
+ggplot(data = all.df2, aes(hatvalues(hr_cad.lm), residuals(hr_cad.lm))) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  labs(title = "Residuals vs Leverage",
+       x = "Leverage",
+       y = "Standardized Residuals") +
+  theme_minimal()
+
+```
+
+\newpage
+## Regressions line scatter plot ----
+
+```{r echo=TRUE, fig.height=5, fig.width=7}
+
+all.df2 %>%
+  ggplot(aes(x = Cadence, y = HR)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression Plot | HR vs Cadence",
+       x = "Cadence",
+       y = "HR") +
+  stat_correlation(mapping = use_label(c("R", "t", "P", "n"))) +
+  stat_regline_equation(label.y.npc = "bottom", label.x.npc = "center") 
+
+
+```
+\newpage
+
+# Cooks distance, outliers and influence ----
+
+```{r echo=TRUE}
+
+# Remove outlier with 95%
+cooksD <- cooks.distance(hr_cad.lm)
+cooksD.95 <- quantile(cooksD, prob = c(.95))
+
+influential <- cooksD[(cooksD > cooksD.95)]
+names_of_influential <- names(influential)
+# influential
+df_outlier <- all.df2[names_of_influential, ]
+
+# Remove outliers
+all.df3 <- all.df2 %>% anti_join(df_outlier)
+
+# Update the index after filters
+rownames(all.df2) <- 1:nrow(all.df2)
+
+# Table of outliers
+
+# Use table to count the number of outliers.
+table(df_outlier$ID)
+
+```
+
+
+
+
+```{r echo=TRUE}
+## After Cooks Distance ----
+signal.lm <- hr_cad.lm
+
+aftrCD.plot <- all.df3 %>%
+  ggplot(aes(x = HR, y = Cadence)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "",
+       x = "HR",
+       y = "Cadence") +
+  stat_correlation(mapping = use_label(c("R", "t", "P", "n")),label.x = "right")
+
+```
+
+
+\newpage
+## Before and After Cook's Distance
+```{r echo=FALSE, fig.height=5, fig.width=13, warning=FALSE}
+
+bfr.aftr <- cowplot::plot_grid(
+  bfrCD.plot, aftrCD.plot,
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("a", "b"),
+  label_size = 20
+)
+
+bfr.aftr 
+
+```
+
+
+
+
+
+
+
