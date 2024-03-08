@@ -147,20 +147,36 @@ library(ggcorrplot)
 reduced_data <- subset(lm.df, select = -c(HR))
 colSums(is.na(reduced_data))
 
+
+# Matrix scatterplot:
+plot(reduced_data, pch=16, col="blue",
+     main="Matrix Scatterplot of mpg, disp, hp, and wt")
+
+
+
 # Compute correlation at 2 decimal places
 corr_matrix = round(cor(reduced_data), 2)
+
 
 # Show the  result
 #ggcorrplot(corr_matrix, hc.order = TRUE)#, type = "lower", lab = TRUE)
 ggcorrplot(corr_matrix, type = "lower", lab = TRUE)
 
+
+
 ```
+
+
+
+
 
 ```{r echo=TRUE}
 hr_multi_model <- lm(HR ~ Speed_NR + Cadence+ Altitude+ Distances +Temperatures + Power +Pace2, 
                 data = lm.df)
 
 summary(hr_multi_model)
+
+
 
 ```
 
@@ -170,6 +186,18 @@ tab_model(hr_multi_model)
 tab_model(hr_multi_model , file = "hr_cad_model.html")
 
 
+# get coefficients
+print(hr_multi_model)
+
+# Get the Intercept and coefficients as vector elements.
+coef(hr_multi_model)
+
+
+# Criterions to identify the quality of the model
+?AIC
+
+#the smaller the AIC or BIC, the better the fit.
+
 aic.full<- AIC(hr_multi_model)
 cat("Full Model AIC:" ,aic.full)
 
@@ -177,6 +205,7 @@ cat("Full Model AIC:" ,aic.full)
 
 
 ```{r echo=TRUE, fig.height=7, fig.width=7}
+# Diagnostic plots for the model
 par(mfrow = c(2,2))
 plot(hr_multi_model)
 
@@ -217,8 +246,6 @@ hr_multi_model %>%
 # Stepwise elimination
 hr_multi_model %>%
   ols_step_both_p(details = TRUE)
-
-
 
 
 ```
