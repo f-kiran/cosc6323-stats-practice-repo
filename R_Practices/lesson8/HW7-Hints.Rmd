@@ -150,7 +150,7 @@ colSums(is.na(reduced_data))
 
 # Matrix scatterplot:
 plot(reduced_data, pch=16, col="blue",
-     main="Matrix Scatterplot of mpg, disp, hp, and wt")
+     main="Matrix Scatterplot of all precictors")
 
 
 
