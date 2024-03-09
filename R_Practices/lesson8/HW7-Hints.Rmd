@@ -64,11 +64,11 @@ all.df2 = read.csv("../data/Multimodal-Activity-Dataset.csv", stringsAsFactors =
 
 pace_split <- strsplit(as.character(all.df2$Pace), ":")
 # Extracting hours and minutes using sapply and lapply
-hours <- sapply(pace_split, function(x) as.numeric(x[1]))
-minutes <- sapply(pace_split, function(x) as.numeric(x[2]) / 60)
+minutes <- sapply(pace_split, function(x) as.numeric(x[1]))
+seconds <- sapply(pace_split, function(x) as.numeric(x[2]) / 60)
 
 # Calculating total pace in hours
-all.df2$Pace2 <- hours + minutes
+all.df2$Pace2 <- minutes + seconds
 
 
 str(all.df2)
@@ -91,7 +91,7 @@ colSums(is.na(all.df2))
 
 # Function to round timestamp to nearest 5 min
 # round_timestamp <- function(timestamp) {
-#   as.POSIXct(round(as.numeric(timestamp) / 10) * 10, origin = "1970-01-01")
+#   as.POSIXct(round(as.numeric(timestamp) / 300) * 300, origin = "1970-01-01")
 # }
 # 
 # # create 5 min interval data set
@@ -171,8 +171,7 @@ ggcorrplot(corr_matrix, type = "lower", lab = TRUE)
 
 
 ```{r echo=TRUE}
-hr_multi_model <- lm(HR ~ Speed_NR + Cadence+ Altitude+ Distances +Temperatures + Power +Pace2, 
-                data = lm.df)
+hr_multi_model <- lm(HR ~ Speed_NR + Cadence+ Altitude+ Distances +Temperatures + Power +Pace2, data = lm.df)
 
 summary(hr_multi_model)
 
@@ -219,7 +218,7 @@ library(MASS)
 library(stargazer)
 library(dplyr)
 
-
+?stepAIC()
 step.optimal <- stepAIC(hr_multi_model, trace = TRUE, direction= "both")
 
 # Compare the models
@@ -278,14 +277,15 @@ ggcorrplot(corr_matrix, type = "lower", lab = TRUE)
 ```{r echo=TRUE}
 ######### REDUCED MODEL SOLUTION
 # Fit the reduced multiple linear regression model
-hr_multi_model_reduced = lm(formula = HR ~ Speed_NR + Cadence + Altitude + Distances + Temperatures  + Pace2 , data = lm.df)
+hr_multi_model_reduced = lm(formula = HR ~ Speed_NR + Cadence + Altitude + Distances + Temperatures  + Pace2 , 
+                            data = lm.df)
 
 summary(hr_multi_model_reduced)
 
 
 aic.reduced<- AIC(hr_multi_model_reduced)
 
-cat("Reduced Model AIC:" ,aic.reduced)
+cat("Reduced Model AIC:" ,aic.reduced , "\n")
 
 cat("Full Model AIC:" ,aic.full)
 
