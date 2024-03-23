@@ -1,0 +1,703 @@
+---
+title: "HW8 Hints "
+author: "COSC6323/Spring 2024"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    toc: true
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+----------
+
+**Question 1: **
+
+
+\newpage
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(latex2exp)
+library(cowplot)
+library(ggpubr)
+library(lme4)
+library(lmerTest) # get the best model
+require(ggpmisc) # stat on plots with facets
+library(rstatix) # tests
+library(qqplotr)
+library(sjPlot) # tab_model()
+library(dplyr)
+
+theme_set(theme_classic()) # set the theme to classic
+theme_update(plot.title = element_text(hjust = 0.5)) # center the title
+
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+
+```
+
+
+
+
+# Utility Functions
+```{r echo=FALSE, fig.height=11, fig.width=20, message=FALSE, warning=FALSE}
+# Without x axis label first rows
+my_theme <- theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    strip.text = element_text(size = 18),
+    legend.position = "none"
+  )
+
+# With  x-y axis label
+my_theme1 <- my_theme +
+  theme(
+    axis.text.x = element_text(size = 8, face = "bold")
+  )
+
+activity_names <- c(
+  `office_work` = "Office Work",
+  `walking` = "Walking",
+  `running` = "Running",
+  `biking` = "Biking",
+  `driving` = "Driving"
+)
+
+mycolors <- c(
+  unknown = "white", office_work = "darkgray", walking = "darkolivegreen",
+  running = "deepskyblue", biking = "orange",
+  driving = "deeppink3"
+)
+```
+
+
+# Read Reference Data
+```{r include=FALSE}
+# Read the all.df file
+dataDir <- paste0("../Data/")
+file <- "Multimodal-Activity-Dataset.csv"
+all.df <- read.csv(paste0(dataDir, file), stringsAsFactors = F)
+str(all.df)
+
+unique(all.df$ID)
+summary(all.df)
+
+nlevels(all.df$Activity)
+unique(all.df$Activity)
+all.df$Activity <- factor(all.df$Activity, levels = c("office_work", "walking", "running", "biking", "driving"))
+nlevels(all.df$Activity)
+unique(all.df$Activity)
+
+# Find the NA rows in HR
+all.df.HR.NAs <- all.df[is.na(all.df$HR), ]
+nrow(all.df.HR.NAs)
+
+# Remove all data points where Cadence is bigger than 0 in driving
+outliers_Cad_Dr <- all.df[all.df$Cadence > 0 & all.df$Activity == "driving", ]
+# Remove outliers
+all.df <- all.df %>% anti_join(outliers_Cad_Dr)
+
+# Remove the NA rows in HR
+all.df <- all.df[!is.na(all.df$HR), ]
+all.df <- all.df %>% group_by(ID)
+
+
+
+## Remove data point where HR is NA, Most of the case any HR file data has NA
+activity_names <- c(
+  `office_work` = "Office Work",
+  `walking` = "Walking",
+  `running` = "Running",
+  `biking` = "Biking",
+  `driving` = "Driving"
+)
+
+# Testing density function
+tmp.d <- density(all.df[all.df$Activity == "office_work", ]$HR)
+plot(tmp.d, main = "Density Estimation")
+tmm.p.d_fun <- approxfun(tmp.d$x, tmp.d$y)
+
+tmm.p.d_fun <- approxfun(density(all.df[all.df$Activity == "office_work", ]$HR))
+tmm.p.d_fun(75)
+
+activity <- "office_work"
+
+# Channel based functions
+density_fun_HR <- function(x, activity) {
+  all.df.HR <- density(all.df[all.df$Activity == activity, ]$HR)
+  all.df.HR_fun <- approxfun(all.df.HR$x, all.df.HR$y)
+  return(all.df.HR_fun(x))
+}
+
+density_fun_HR(0:200, activity)
+
+density_fun_Speed <- function(x, activity) {
+  all.df.Speed_NR <- density(all.df[all.df$Activity == activity, ]$Speed_NR)
+  all.df.Speed_fun <- approxfun(all.df.Speed_NR$x, all.df.Speed_NR$y)
+  return(all.df.Speed_fun(x))
+}
+
+density_fun_Speed(0:75, activity)
+
+density_fun_Cadence <- function(x, activity) {
+  all.df.Cadence <- density(all.df[all.df$Activity == activity, ]$Cadence)
+  all.df.Cadence_fun <- approxfun(all.df.Cadence$x, all.df.Cadence$y)
+  return(all.df.Cadence_fun(x))
+}
+
+all.df.Cadence <- density(all.df[all.df$Activity == activity, ]$Cadence)
+plot(all.df.Cadence, main = "Density Estimation")
+all.df.Cadence_fun <- approxfun(all.df.Cadence$x, all.df.Cadence$y)
+
+density_fun_Cadence(1:100, activity)
+
+# Create a function for each channel and activity
+
+# HR
+density_fun_HR_office_work <- function(x) density_fun_HR(x, "office_work")
+density_fun_HR_walking <- function(x) density_fun_HR(x, "walking")
+density_fun_HR_running <- function(x) density_fun_HR(x, "running")
+density_fun_HR_biking <- function(x) density_fun_HR(x, "biking")
+density_fun_HR_driving <- function(x) density_fun_HR(x, "driving")
+
+density_fun_HR_biking(40:200)
+
+# Speed
+density_fun_Speed_office_work <- function(x) density_fun_Speed(x, "office_work")
+density_fun_Speed_walking <- function(x) density_fun_Speed(x, "walking")
+density_fun_Speed_running <- function(x) density_fun_Speed(x, "running")
+density_fun_Speed_biking <- function(x) density_fun_Speed(x, "biking")
+density_fun_Speed_driving <- function(x) density_fun_Speed(x, "driving")
+
+density_fun_Speed_office_work(10)
+
+# Cadence
+density_fun_Cadence_office_work <- function(x) density_fun_Cadence(x, "office_work")
+density_fun_Cadence_walking <- function(x) density_fun_Cadence(x, "walking")
+density_fun_Cadence_running <- function(x) density_fun_Cadence(x, "running")
+density_fun_Cadence_biking <- function(x) density_fun_Cadence(x, "biking")
+density_fun_Cadence_driving <- function(x) density_fun_Cadence(x, "driving")
+
+density_fun_Cadence_office_work(10)
+
+##### ------ Channel based functions --- end
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# My density function
+channel <- "HR"
+activity <- "driving"
+
+rm(density_fun)
+density_fun <- function(input, activity, channel) {
+  tmp.density <- density(all.df[all.df$Activity == activity, c(channel)][[1]])
+  tmp.density_fun <- approxfun(tmp.density$x, tmp.density$y)
+  return(tmp.density_fun(input))
+}
+```
+
+
+
+# Read the raw data
+
+```{r echo=TRUE}
+
+
+# Read 6 subjects data
+
+
+all.df2 = read.csv(paste0("../data/Naturalistic-Multimodal-Activity-Dataset_v4.csv"), stringsAsFactors = F)
+
+colSums(is.na(all.df2))
+str(all.df2)
+all.df2 <- all.df2 %>% drop_na(Time)
+
+
+
+
+all.df2$Time <- as.POSIXct(all.df2$Time, format = "%Y-%m-%d %H:%M:%S")
+# 
+#factor(all.df2$Day2)
+ 
+all.df2$Day2 <- factor(all.df2$Day2 , 
+                        levels = c("PR", "PR2", "MD", "MD2",  "PS", "PS2", "RD", "RD2"))
+levels(all.df2$Period)
+
+all.df2$Period <- as.factor(all.df2$Period)
+all.df2$Gender <- as.factor(all.df2$Gender)
+
+all.df2$Time2 <- format(all.df2$Time, "%H:%M:%S")
+
+all.df2$Time2 <- as.POSIXct(all.df2$Time2, format = "%H:%M:%S")
+
+
+
+# Check for missing values
+colSums(is.na(all.df2))
+
+str(all.df2)
+
+
+```
+
+
+
+## PDF implementation
+
+```{r include=FALSE}
+unique(all.df2$ID)
+table(unique(all.df2$Day2))
+
+all.df2 <- droplevels(all.df2)
+colnames(all.df2)
+
+all.df_extented_3 <- all.df2 %>%
+  mutate(
+    Offc_HR.dens = density_fun_HR_office_work(HR),
+    Offc_Speed_NR.den = density_fun_Speed_office_work(Speed_NR),
+    Offc_Cadence.dens = density_fun_Cadence_office_work(Cadence)
+  ) %>%
+  mutate(
+    Wlkg_HR.dens = density_fun_HR_walking(HR),
+    Wlkg_Speed_NR.den = density_fun_Speed_walking(Speed_NR),
+    Wlkg_Cadence.dens = density_fun_Cadence_walking(Cadence)
+  ) %>%
+  mutate(
+    Rnng_HR.dens = density_fun_HR_running(HR),
+    Rnng_Speed_NR.den = density_fun_Speed_running(Speed_NR),
+    Rnng_Cadence.dens = density_fun_Cadence_running(Cadence)
+  ) %>%
+  mutate(
+    Bkg_HR.dens = density_fun_HR_biking(HR),
+    Bkg_Speed_NR.den = density_fun_Speed_biking(Speed_NR),
+    Bkg_Cadence.dens = density_fun_Cadence_biking(Cadence)
+  ) %>%
+  mutate(
+    Drvg_HR.dens = density_fun_HR_driving(HR),
+    Drvg_Speed_NR.den = density_fun_Speed_driving(Speed_NR),
+    Drvg_Cadence.dens = density_fun_Cadence_driving(Cadence)
+  ) %>%
+  mutate(
+    Offc_multi.dens = Offc_HR.dens * Offc_Speed_NR.den * Offc_Cadence.dens,
+    Wlkg_multi.dens = Wlkg_HR.dens * Wlkg_Speed_NR.den * Wlkg_Cadence.dens,
+    Rnng_multi.dens = Rnng_HR.dens * Rnng_Speed_NR.den * Rnng_Cadence.dens,
+    Bkg_multi.dens = Bkg_HR.dens * Bkg_Speed_NR.den * Bkg_Cadence.dens,
+    Drvg_multi.dens = Drvg_HR.dens * Drvg_Speed_NR.den * Drvg_Cadence.dens
+  )
+```
+
+
+```{r include=FALSE}
+# Replace NA with 0 in probability products values.
+# Replace values less than 0.000001 with 0
+colnames(all.df_extented_3)
+
+denscols = c("Offc_HR.dens",
+             "Offc_Speed_NR.den",
+             "Offc_Cadence.dens", "Wlkg_HR.dens", "Wlkg_Speed_NR.den", "Wlkg_Cadence.dens",
+             "Rnng_HR.dens", "Rnng_Speed_NR.den", "Rnng_Cadence.dens",
+             "Bkg_HR.dens", "Bkg_Speed_NR.den", "Bkg_Cadence.dens",
+             "Drvg_HR.dens", "Drvg_Speed_NR.den", "Drvg_Cadence.dens" )
+
+all.df_extented_3[, denscols] %>%
+  replace(., is.na(.), 0) -> all.df_extented_3[, denscols]
+
+all.df_extented_3[, denscols] %>%
+  replace(., . < 0.000001, 0) -> all.df_extented_3[, denscols]
+
+
+# Replace NA with 0 in probability products values.
+all.df_extented_3 <- all.df_extented_3 %>%
+  mutate_at(vars(Offc_multi.dens, Wlkg_multi.dens, Rnng_multi.dens, Bkg_multi.dens, Drvg_multi.dens), ~ replace_na(., 0))
+
+
+# Find the max value in each row
+all.df_extented_3$max_indVal <- apply(all.df_extented_3[, c(
+  "Offc_multi.dens", "Wlkg_multi.dens",
+  "Rnng_multi.dens", "Bkg_multi.dens",
+  "Drvg_multi.dens"
+)], 1, max)
+
+# Find the column name of the max value in each row if not all of them are zero
+all.df_extented_3 %>%
+  mutate(
+    max_ind = pmap_dbl(list(
+      Offc_multi.dens, Wlkg_multi.dens, Rnng_multi.dens, Bkg_multi.dens,
+      Drvg_multi.dens ), ~ which.max(c(...)))
+  ) -> all.df_extented_3
+
+
+
+# If all products are zero (max_indVal = 0), then the max_ind should be zero
+all.df_extented_3[all.df_extented_3$max_indVal == 0, ]$max_ind <- 0
+
+all.df_extented_3$max_ind <- as.factor(all.df_extented_3$max_ind)
+
+# Recode the factor
+all.df_extented_3$max_ind <- recode_factor(all.df_extented_3$max_ind,
+  `0` = "unknown", `1` = "office_work",
+  `2` = "walking", `3` = "running", `4` = "biking",
+  `5` = "driving"
+)
+
+
+str(all.df_extented_3)
+table(all.df_extented_3$ID)
+```
+
+
+## Cut the time into 5 min intervals
+```{r include=FALSE}
+colnames(all.df_extented_3)
+all.df_extented_3_2 <- all.df_extented_3[,c(1:23,45)]
+colnames(all.df_extented_3_2)
+
+
+# Add Day2 Label here
+# Remove NAs from the data
+str(all.df_extented_3_2)
+colnames(all.df_extented_3_2)
+colSums(is.na(all.df_extented_3_2))
+
+
+# helper to get the max values names from the aggreegated data.
+max_freq <- function(x) {
+  return(names(which.max(table(x))))
+}
+
+
+all.df2_cut <- all.df_extented_3_2 %>%
+  #filter(ID == "T009") %>%
+  group_by(ID,Time) %>%
+  # Time needs to be Posixct
+  mutate(Time =
+           as.POSIXct(Time, format = "%Y-%m-%d %H:%M:%S") %>%
+           floor_date("5 min")) %>%
+  summarise(ID = first(ID),
+            Day = first(Day),
+            Activity = first(Activity),
+            Day2 = first(Day2),
+            Period = first(Period),
+            # return name of max index
+            max_ind = max_freq(max_ind),
+            HR_normalized = mean(HR_normalized, na.rm = TRUE),
+            HR = mean(HR, na.rm = TRUE),
+            Speed = mean(Speed, na.rm = TRUE),
+            Cadence = mean(Cadence, na.rm = TRUE),
+            Altitude = mean(Altitude, na.rm = TRUE),
+            Distances = mean(Distances, na.rm = TRUE),
+            Temperatures = mean(Temperatures, na.rm = TRUE),
+            Power = mean(Power, na.rm = TRUE),
+            Speed_NR = mean(Speed_NR, na.rm = TRUE),
+            Pace2 = mean(Pace2, na.rm = TRUE),
+            # new variables
+            Age = first(Age),
+            Gender = first(Gender),
+            BMI = first(BMI)
+            
+            ) %>%
+  ungroup()
+
+
+
+levels(all.df2_cut$Day2)
+
+all.df2_cut$Day2 <- factor(all.df2_cut$Day2 , 
+                                 levels = c("PR", "PR2", "MD", "MD2",  "PS", "PS2", "RD")
+                                 )
+
+#all.df2_cut$Time <- as.POSIXct(all.df2_cut$Time, format = "%Y-%m-%d %H:%M:%S")
+all.df2_cut$Time2 <- format(all.df2_cut$Time, "%H:%M:%S")
+all.df2_cut$Time2 <- as.POSIXct(all.df2_cut$Time2, format = "%H:%M:%S")
+colnames(all.df2_cut)
+
+# Recode the factor
+all.df2_cut$max_ind <- recode_factor(all.df2_cut$max_ind,
+  `0` = "unknown", `1` = "office_work",
+  `2` = "walking", `3` = "running", `4` = "biking",
+  `5` = "driving"
+)
+
+
+str(all.df2_cut)
+
+
+```
+
+
+
+
+\newpage
+# Question 1
+
+
+
+
+## Inspection of the data
+
+```{r echo=TRUE}
+
+browseURL("https://osf.io/m43vw/wiki/Homework%208/")
+######### MODEL SOLUTION
+# Fit the multiple linear regression model
+
+all.df.glm = all.df2_cut%>%
+  #filter(Day2 == "MD") %>%
+  filter(max_ind != "unknown") %>%
+  #dplyr::select(ID, Day2,HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power,Pace2, Age, Gender, BMI) %>% 
+  dplyr::select(HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power, Pace2, Period, Age, BMI, max_ind) %>% 
+  drop_na()
+
+dim(all.df.glm)
+str(all.df.glm)
+sum(is.na(all.df.glm))
+colSums(is.na(all.df.glm))
+
+
+
+```
+
+\newpage
+
+# Multi Linear Model and diagnostic
+
+## COLLINEARITY CHECK
+```{r echo=TRUE}
+
+######### COLLINEARITY CHECK
+library(ggcorrplot)
+# Remove the HR column
+reduced_data <- subset(all.df.glm, select = -c(HR, Age, Period, max_ind))
+colSums(is.na(reduced_data))
+str(reduced_data)
+
+# Compute correlation at 2 decimal places
+corr_matrix = round(cor(reduced_data), 2)
+
+# Show the  result for predictors
+#ggcorrplot(corr_matrix, hc.order = TRUE)#, type = "lower", lab = TRUE)
+ggcorrplot(corr_matrix, type = "lower", lab = TRUE)
+
+```
+
+
+# HR Full Model 
+
+```{r echo=TRUE}
+?lm()
+?glm()
+
+hr_multi_model <- glm(HR ~ Speed_NR + Cadence+ Altitude+ Distances +Temperatures + Power +Pace2 + Period + Age + BMI + max_ind, data = all.df.glm)
+
+summary(hr_multi_model)
+
+hr_multi_model <- glm(HR ~ Cadence+ Altitude+ Distances +Temperatures + Power +Pace2 + Period + Age + BMI + max_ind, data = all.df.glm)
+
+
+hr_multi_model <- glm(HR ~ 1, data = all.df.glm) # forward starts
+summary(hr_multi_model)
+
+
+```
+
+# HR Full Model plots
+```{r}
+m.plot <- sjPlot::plot_model(hr_multi_model,
+                   show.values=TRUE, show.p=TRUE,
+                   title="") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) + theme_bw()
+
+#m.plot$data$term
+m.plot
+
+```
+
+## Full Model Assumption Checking
+
+
+```{r echo=TRUE, fig.height=7, fig.width=7}
+par(mfrow = c(2,2))
+plot(hr_multi_model)
+
+```
+
+
+```{r echo=TRUE}
+
+library(olsrr)
+library(MASS)
+library(stargazer)
+library(dplyr)
+
+
+step.optimal <- stepAIC(hr_multi_model, trace = TRUE, direction= "both")
+
+# Compare the models
+stargazer(hr_multi_model, step.optimal, type = "text")
+
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+
+# Backward elimination
+optimal_be = hr_multi_model %>% 
+  ols_step_backward_p(details = F)
+
+optimal_be
+
+# # Forward elimination
+# optimal_fe = hr_multi_model %>% 
+#   ols_step_forward_p(details = TRUE)
+# 
+# # Stepwise elimination
+# optimal_se = hr_multi_model %>%
+#   ols_step_both_p(details = TRUE)
+
+```
+
+
+# Backward Elimination (BE) Optimal Model Selection
+
+```{r echo=TRUE}
+
+step_bw <- step(hr_multi_model, direction = "backward", trace = TRUE)
+summary(step_bw) # Display elimination results
+
+
+```
+## get model from step_bw
+
+```{r}
+#get model from step_bw
+final_hr_multi_model.bw <- eval(step_bw$call)
+summary(final_hr_multi_model.bw)
+AIC(final_hr_multi_model.bw)
+
+```
+
+## Final Model Assumption Checking
+
+```{r echo=FALSE, fig.height=7}
+par(mfrow=c(2,2))
+plot(final_hr_multi_model.bw)
+```
+
+# Final HR Model plots
+
+```{r}
+m.plot <- sjPlot::plot_model(final_hr_multi_model.bw,
+                   show.values=TRUE, show.p=TRUE,
+                   title="") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) + theme_bw()
+
+m.plot
+```
+
+
+## Final Model Predictors Plots
+
+```{r}
+summary(final_hr_multi_model.bw)
+activity.plot <-plot_model(final_hr_multi_model.bw, 
+             type = "pred", 
+             terms = "max_ind",
+             dot.size = 5,
+             line.size = 2,
+             title = "Activity") +  theme_bw()+
+
+    aes(color = c("1", "2", "3", "4", "5")) +
+    #scale_color_manual( values = c( "gray","orange","orange")) +
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+
+
+summary(final_hr_multi_model.bw)
+period.plot <-plot_model(final_hr_multi_model.bw, 
+             type = "pred", 
+             terms = "Period",
+             dot.size = 6,
+             line.size = 2,
+             title = "Period") +  theme_bw()+
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+
+
+```
+
+
+```{r fig.height=5, fig.width=10, warning=FALSE}
+ggarrange(activity.plot, period.plot, ncol = 2, nrow = 1)
+
+```
+
+
+#  HR vs. Various Predictors with Mixed Effects
+
+```{r}
+
+all.df.glm = all.df2_cut%>%
+  filter(Day2 == "MD") %>%
+  filter(max_ind != "unknown") %>%
+  #dplyr::select(ID, Day2,HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power,Pace2, Age, Gender, BMI) %>% 
+  dplyr::select(ID,HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power, Pace2, Period, Age, BMI, max_ind) %>% 
+  drop_na()
+
+
+hr_multi_model <- lmer(HR ~ Speed_NR + Cadence+ Altitude+ Distances +Temperatures + Power +Pace2  + Period + Age + BMI + max_ind + (1 | ID), data = all.df.glm)
+
+summary(hr_multi_model)
+
+```
+
+# HR Final Model plots
+```{r}
+step_bw <- step(hr_multi_model, direction = "backward", trace = TRUE)
+step_bw # Display elimination results
+
+```
+## get model from step_bw
+
+```{r}
+#get model from step_bw
+final_hr_multi_model.bw <- glm(formula = HR ~ Cadence + Distances + Temperatures + Power + 
+    Pace2 + Period + Age + BMI+ max_ind + (1+ID), data = all.df.glm)
+
+
+summary(final_hr_multi_model.bw)
+
+
+```
+
+
+
