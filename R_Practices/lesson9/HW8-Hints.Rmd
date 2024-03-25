@@ -690,7 +690,7 @@ step_bw # Display elimination results
 
 ```{r}
 #get model from step_bw
-final_hr_multi_model.bw <- glm(formula = HR ~ Cadence + Distances + Temperatures + Power + 
+final_hr_multi_model.bw <- lmer(formula = HR ~ Cadence + Distances + Temperatures + Power + 
     Pace2 + Period + Age + BMI+ max_ind + (1+ID), data = all.df.glm)
 
 
