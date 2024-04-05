@@ -19,6 +19,7 @@ knitr::opts_chunk$set(
 
 
 
+
 ```{r include=FALSE}
 library(tidyverse)
 library(lubridate)
@@ -161,7 +162,9 @@ result.aov
 
 # https://library.virginia.edu/data/articles/diagnostic-plots
 
-hr_cad.lm <- lm(HR ~ Cadence, data = all.df2)
+hr_cad.lm <- lm(HR ~ Cadence, data = all.df3)
+
+
 summary(hr_cad.lm)
 ```
 \newpage
