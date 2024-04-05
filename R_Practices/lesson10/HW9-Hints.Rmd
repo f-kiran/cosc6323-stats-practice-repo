@@ -476,7 +476,6 @@ all.df2_cut %>%
 
 all.df.glm = all.df2_cut%>%
   filter(max_ind != "unknown") %>%
-  #dplyr::select(ID, Day2,HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power,Pace2, Age, Gender, BMI) %>% 
   dplyr::select(HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power, Pace2, Period, Age, BMI, max_ind, Day2) %>% 
   drop_na()
 
@@ -517,7 +516,6 @@ model.matrix(~0+., data=reduced_data) %>%
 all.df.glm = all.df2_cut%>%
   #filter(Day2 == "MD") %>%
   filter(max_ind != "unknown") %>%
-  #dplyr::select(ID, Day2,HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power,Pace2, Age, Gender, BMI) %>% 
   dplyr::select(ID,HR, Speed_NR, Cadence, Altitude, Distances, Temperatures, Power, Pace2, Period, Age, BMI, max_ind,Day2) %>% 
   drop_na()
 
@@ -534,7 +532,7 @@ str(all.df.glm)
 ```{r echo=FALSE}
 
 
-hr_multi_model <- lmer(HR ~ Speed_NR + Cadence+ Altitude+ Distances +Temperatures + Power +Pace2  + Period + Age + BMI + max_ind +Day2+ (1 | ID), data = all.df.glm)
+hr_multi_model <- lmer(HR ~ Speed_NR + Cadence+ Altitude+ Distances +Temperatures + Power +Pace2  + Period + Age + BMI + max_ind +Day2 + (1 | ID), data = all.df.glm)
 
 summary(hr_multi_model)
 
@@ -596,7 +594,8 @@ for (i in activities2) {
   #print(i)
   tmp_plot = all.df.glm %>%
           filter(max_ind != i) %>%
-          ggplot(aes(x = Distances, y = HR)) +
+          #ggplot(aes(x = Distances, y = HR)) +
+          ggplot(aes(x = Pace2, y = HR)) +
           geom_point() + geom_smooth(method='lm', color="red") +
           stat_correlation(mapping = use_label(c("R", "t", "P", "n")),label.x = "right") +
    # scale_x_continuous(breaks = c(0, 10000,200000, 300000)) +
@@ -657,7 +656,7 @@ m.plot
 ```{r echo=FALSE}
 
 final_hr_multi_model.bw <-
- lmer(formula = HR ~ Cadence  + Pace2 + Age + BMI + max_ind + Period *Day2 + (1 | ID), data = all.df.glm)
+ lmer(formula = HR ~ Cadence  + Pace2 + Age + BMI + max_ind + Period*Day2 + (1 | ID), data = all.df.glm)
 
 summary(final_hr_multi_model.bw)
 #display(final_hr_multi_model.bw)
@@ -783,7 +782,6 @@ kable_classic(full_width = F, html_font = "Cambria")
 
 ## Random Effects Plot
 ```{r echo=FALSE}
-
 dotplot(ranef(final_hr_multi_model.bw))
 ```
 
