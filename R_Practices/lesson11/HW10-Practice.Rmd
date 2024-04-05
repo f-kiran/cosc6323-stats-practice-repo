@@ -1,0 +1,408 @@
+---
+title: "HW10 Practice"
+author: "COSC6323/Spring 2024 | N = 30"
+date: "`r Sys.Date()`"
+output: pdf_document
+toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+library(readr)
+library(gridExtra)
+library(MASS)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library("car")
+library("ggpmisc") # stats on plots
+library("readxl")
+library(kableExtra)
+library(reshape2) # used for melt()
+# install.packages("abind")
+library(abind)
+
+rm(list = ls())
+getwd()
+theme_set(theme_classic()) # set the theme to classic
+theme_update(plot.title = element_text(hjust = 0.5)) # center the title
+```
+
+```{r include=FALSE}
+
+
+
+
+Df <- read.csv("../Data/Affective-Math-Dataset_3.csv", stringsAsFactors = T)
+
+# Exam data
+Df_Exam <- Df[Df$Session == "Exam", ]
+
+freq.dist <- read_excel("Typical-SUS-Distributions.xlsx",
+  sheet = 1, col_names = T
+)
+
+colnames(freq.dist)[1] <- "SUS.Q"
+
+freq.dist <- freq.dist[, 1:5]
+## Add 0
+freq.dist["0"] <- 0
+freq.dist <- freq.dist[, c(1, 6, 2:5)]
+
+str(freq.dist)
+
+Df_Exam.SubSet <- Df_Exam
+```
+
+
+
+
+
+```{r include=FALSE}
+Df_Exam.SubSet2 <- Df_Exam.SubSet[, c(
+  "ParticipantID", "Gender", # "SAI.Score",
+  "SUS.Q1",
+  "SUS.Q2",
+  "SUS.Q3",
+  "SUS.Q4",
+  "SUS.Q5",
+  "SUS.Q6",
+  "SUS.Q7",
+  "SUS.Q8",
+  "SUS.Q9",
+  "SUS.Q10",
+  "course_cat"
+)]
+
+
+Subject_level <- Df_Exam.SubSet2 %>%
+  group_by(ParticipantID) %>%
+  slice_head(n = 1)
+
+
+str(Subject_level)
+SUS.df <- Subject_level[, c(-1, -2, -13)]
+table(SUS.df$SUS.Q1)
+str(SUS.df)
+
+#Convert int columns to factor
+#SUS.df <- SUS.df %>% mutate_if(is.integer, as.factor)
+
+
+```
+
+\newpage
+
+# Distribution of SUS Scores
+
+```{r echo=FALSE, fig.height=11, fig.width=8}
+plot(SUS.df)
+```
+
+
+
+
+
+
+# Calculate Chi Square Test for Each Question
+## Q1 example 
+
+```{r}
+
+freq.dist2 <- freq.dist %>% 
+  dplyr::select(-SUS.Q) 
+
+results.df <- data.frame(
+  Question = as.character(NA),
+  chi = as.numeric(NA),
+  df = as.numeric(NA),
+  p_value = as.character(NA)
+) 
+
+
+# Lets calculate the chi-square test for Q1 question
+i = 1
+
+print(paste0("Q", i))
+
+tmp.Q.freq <- table(factor(SUS.df[[i]], levels = c(0, 1, 2, 3, 4)))
+
+
+tmp.national.freq <- as.numeric(freq.dist2[i, ])
+
+? chisq.test()
+
+result <- chisq.test(tmp.Q.freq, p = tmp.national.freq + 0.000000001)
+
+result
+# Extract the relevant information from the test result
+
+print(result)
+Que <- paste0("Q", i)
+chi_square <- result$statistic
+df <- result$parameter
+# p_value <- format.pval(result$p.value)
+p_value <- result$p.value
+if (p_value <= 0) {
+  p_value <- "p < 0.001"
+}
+results.df <- rbind(results.df, c(Que, chi_square, df, p_value))
+```
+
+
+
+
+
+# Table of Chi Square Test Results
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+freq.dist2 <- freq.dist %>% 
+  dplyr::select(-SUS.Q) 
+
+
+results.df <- data.frame(
+  Question = as.character(NA),
+  chi = as.numeric(NA),
+  df = as.numeric(NA),
+  p_value = as.character(NA)
+) 
+
+
+# create a data frame to store the results of the chi-square test
+
+
+
+## calculate the chi-square test for each question
+
+for (i in 1:length(SUS.df)) {
+  print(paste0("Q", i))
+
+  tmp.Q.freq <- table(factor(SUS.df[[i]], levels = c(0, 1, 2, 3, 4)))
+  tmp.national.freq <- as.numeric(freq.dist2[i, ])
+
+  result <- chisq.test(tmp.Q.freq, p = tmp.national.freq + 0.000000001)
+  result
+  
+  # Extract the relevant information from the test result
+  print(result)
+  Que <- paste0("Q", i)
+  chi_square <- result$statistic
+  df <- result$parameter
+  # p_value <- format.pval(result$p.value)
+  p_value <- result$p.value
+  if (p_value <= 0) {
+    p_value <- "p < 0.001"
+  }
+  results.df <- rbind(results.df, c(Que, chi_square, df, p_value))
+}
+
+
+results.df <- results.df %>% 
+  dplyr::filter(!is.na(Question))
+
+```
+
+```{r echo=FALSE}
+results.df %>%
+kable(
+  col.names = c("Question", "Chi", "Df", "P-value"),
+  row.names = FALSE, booktabs = T, align = c("c"),
+  caption = " Chisq Test Results"
+) %>%
+  kable_styling(
+    "striped",
+    full_width = T,
+    latex_options = c("HOLD_position", "scale_down")
+  )
+```
+
+
+\newpage
+
+
+```{r echo=FALSE}
+course_level <- Subject_level[, c(-1, -2)]
+melt_data <- melt(course_level, id = c("course_cat"))
+colnames(melt_data) <- c("group", "question", "answer")
+```
+
+## Frequency Table of Local and National
+
+```{r echo=FALSE}
+
+melt_data.local <- melt_data
+melt_data.local["group"] <- "local"
+contingency.local <- xtabs(~ group + question + answer, data = melt_data.local)
+
+ftable(contingency.local)
+# contingency.local.percent = contingency.local %>%
+#    prop.table() %>% {. * 10} %>%
+#    round(2)
+# ftable(contingency.local.percent)
+
+# use national's table
+freq1 <- freq.dist
+melt_data.national <- melt(freq1, id = c("SUS.Q"))
+colnames(melt_data.national) <- c("question", "answer", "value")
+melt_data.national["group"] <- "national"
+
+#melt_data.national$value <- melt_data.national$value*100
+contingency.national <- xtabs(value ~ group + question + answer, data = melt_data.national)
+
+#ftable(contingency.national)
+
+
+```
+
+
+## Mosaic Plot - Probability Table of Local and National
+
+***Multiply the national frequency by 30 to magnify in the plot ***
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+
+#?abind()
+
+magnify <- 30
+
+contingency.abind <- abind(local = contingency.local,
+                           national = contingency.national*magnify, along = 1) 
+
+dimnames(contingency.abind)[[2]] <- list("SUS.Q1", "SUS.Q2", "SUS.Q3", "SUS.Q4", "SUS.Q5", "SUS.Q6", "SUS.Q7", "SUS.Q8", "SUS.Q9", "SUS.Q10")
+ftable(contingency.abind)
+
+
+?mosaicplot()
+library("graphics") # required for mosaicplot()
+
+mosaicplot(contingency.local)
+mosaicplot(contingency.national)
+
+ftable(contingency.abind)
+
+mosaicplot(contingency.abind, main = "", cex.axis = 1, color = T)
+```
+
+
+\newpage
+## Log-Linear Models
+
+```{r echo=FALSE}
+
+?loglm()
+
+```
+
+## group
+
+```{r echo=TRUE}
+
+# 1 = group , #2 = question , #3 = answer
+r1 <- loglm(~1, contingency.abind)
+summary(r1)
+
+```
+
+## group +  question 
+
+```{r echo=TRUE}
+
+# 1 = group , #2 = question , #3 = answer
+r2 <- loglm(~ 1 + 2, contingency.abind)
+summary(r2)
+
+```
+
+## Final Model: group +  question +  answer
+```{r echo=TRUE}
+# 1 = group , #2 = question , #3 = answer
+r3 <- loglm(~ 1 + 2 + 3, contingency.abind)
+summary(r3)
+
+```
+
+## Conclusion 
+
+The p-value is less than 0.05, which means that the null hypothesis (that the observed frequencies are consistent with the expected probabilities) can be rejected. So, there is strong evidence to suggest that the given probabilities is different from the expected distributions. 
+
+
+\newpage
+# Investigation of SUS Questionnaire for the local students
+
+## Frequency Table Local by course category
+
+```{r include=FALSE}
+course_level <- Subject_level[, c(-1, -2)]
+view(course_level)
+
+melt_data <- melt(course_level, id = c("course_cat"))
+view(melt_data)
+
+colnames(melt_data) <- c("group", "question", "answer")
+```
+
+
+```{r echo=FALSE}
+contingency.local <- table(melt_data$group, melt_data$question, melt_data$answer)
+
+ftable(contingency.local)
+```
+
+
+## Mosaic plot
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+#ftable(contingency.local)
+mosaicplot(contingency.local, main = "", cex.axis = 1, color = T)
+```
+
+
+\newpage
+## Log-Linear Models 
+
+```{r echo=FALSE}
+r <- loglm(~1, contingency.local) # 1 = group
+r1 <- loglm(~ 1 + 2, contingency.local) # 2 = question
+r2 <- loglm(~ 1 + 2 + 3, contingency.local) # 3 = answer
+
+# summary(r)
+```
+
+## group
+
+```{r}
+# 1 = group , #2 = question , #3 = answer
+summary(r)
+```
+
+## group +  question 
+
+```{r}
+# 1 = group , #2 = question , #3 = answer
+summary(r1)
+```
+
+## group +  question +  answer
+
+```{r}
+# 1 = group , #2 = question , #3 = answer
+summary(r2)
+```
+
+
+## Conclusion 
+
+P values of likelihood and pearson are less than 0.05. This suggests that there are significant differences in the frequency of responses between the University of Houston (college) and Houston Community College (developmental) participants for each level of
+SUS response.
