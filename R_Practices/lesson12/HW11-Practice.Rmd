@@ -1,0 +1,494 @@
+---
+title: "HW11 Practice"
+author: "COSC6323/Spring 2024 | N = 30"
+date: "`r Sys.Date()`"
+output: pdf_document
+toc: true
+---
+
+
+```{r include=FALSE}
+### Here are the libraries needed
+library(tidyverse)
+# install.packages("DescTools")
+library(DescTools) ### for the Multinomial CI
+library(MASS) ### For the stepwise methods used in Logistic Regression
+library(lme4)
+library(sjPlot)
+library(lmerTest) ### package for backward elimination in Mixed Models
+# install.packages("buildmer")
+library(buildmer) ### package for forward selection in Mixed Models
+# install.packages("cAIC4")
+library(cAIC4)
+library(performance)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+rm(list = ls())
+Df <- read.csv("../Data/Affective-Math-Dataset_3.csv", stringsAsFactors = T)
+
+# Baseline Data
+# BL Data
+Df_BL <- Df[Df$Session == "BL", ]
+
+
+# Remove unnecessary columns
+Df_BL.SubSet <- subset(Df_BL,
+  select = c(ParticipantID, Perspiration, HR.E4, HR.AW, Time)
+)
+
+# Add NAs to S003 PP
+# Df_BL.SubSet$Perspiration[Df_BL.SubSet$ParticipantID == "S003"] <- NA
+
+# Adding pp_log column to the data
+Df_BL.SubSet["pp_log"] <- log(Df_BL.SubSet$Perspiration)
+
+
+# Sync E4 and AW HRs to have perfect E4
+# initialize the e4 perfect
+Df_BL.SubSet$HR.E4_perfect <- Df_BL.SubSet$HR.E4
+# Add NAs to perfect where the AW has NAs
+Df_BL.SubSet[is.na(Df_BL.SubSet$HR.AW), ]$HR.E4_perfect <- NA
+
+# Exam data
+Df_Exam <- Df[Df$Session == "Exam", ]
+names(Df_Exam)
+# Remove unnecessary columns
+Df_Exam.SubSet <- subset(Df_Exam, select = -c(4, 5, 29:35, 48:50))
+
+colnames(Df_Exam.SubSet)
+# Fill the NAs with previous values.
+Df_Exam.SubSet <- Df_Exam.SubSet %>% fill(Question.Type)
+Df_Exam.SubSet <- Df_Exam.SubSet %>% fill(Question.Name)
+Df_Exam.SubSet <- Df_Exam.SubSet %>% fill(Accuracy.Score)
+Df_Exam.SubSet <- Df_Exam.SubSet %>% fill(Attempt)
+Df_Exam.SubSet <- Df_Exam.SubSet %>% fill(Total.Attempts)
+
+# Remove Examples
+Df_Exam.SubSet <- Df_Exam.SubSet[!Df_Exam.SubSet$Question.Type == "Example", ]
+
+# Remove 2nd and 3rd attempts
+# Means that take the all first attempts
+Df_Exam.SubSet <- Df_Exam.SubSet[Df_Exam.SubSet$Attempt == 1, ]
+
+# Rename Accuracy.Score, correct =1, incorrect = 0, as Attempt.Correctness
+Df_Exam.SubSet <- Df_Exam.SubSet %>% rename("Attempt.Correctness" = "Accuracy.Score")
+
+# Adding pp_log column to the data
+Df_Exam.SubSet["pp_log"] <- log(Df_Exam.SubSet$Perspiration)
+
+# Sync E4 and AW HRs to have perfect
+# initialize the e4 perfect
+Df_Exam.SubSet["HR.E4_perfect"] <- Df_Exam.SubSet$HR.E4
+
+# Add NAs to perfect where the AW has NAs
+Df_Exam.SubSet[is.na(Df_Exam.SubSet$HR.AW), ]$HR.E4_perfect <- NA
+
+# Update the index after sync
+rownames(Df_Exam.SubSet) <- 1:nrow(Df_Exam.SubSet)
+
+# Drop Example level in Question.Type
+Df_Exam.SubSet <- droplevels(Df_Exam.SubSet)
+
+unique(Df_Exam.SubSet$Question.Type)
+names(Df_Exam.SubSet)
+
+Response.len <- colSums(!is.na(Df_Exam.SubSet))[["HR.E4_perfect"]]
+HR.len <- colSums(!is.na(Df_Exam.SubSet))[["HR.E4"]]
+AW.len <- colSums(!is.na(Df_Exam.SubSet))[["HR.AW"]]
+```
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Removing Outliers at Signal Level
+signal.lm.HRs <- lm(HR.E4_perfect ~ HR.AW, data = Df_Exam.SubSet)
+
+# Method 3 - Remove Quantiles
+cooksD <- cooks.distance(signal.lm.HRs)
+cooksD.95 <- quantile(cooksD, prob = c(.95))
+
+influential <- cooksD[(cooksD > cooksD.95)]
+
+names_of_influential <- names(influential)
+# influential
+df_outlier <- Df_Exam.SubSet[names_of_influential, ]
+# SLevel_without_outliers <- SLevel %>% anti_join(df)
+Df_Exam.SubSet <- Df_Exam.SubSet %>% anti_join(df_outlier)
+
+# Update the index after filters
+rownames(Df_Exam.SubSet) <- 1:nrow(Df_Exam.SubSet)
+```
+
+
+```{r include=FALSE}
+# Baseline Means
+
+Df_BL.SubSet2 <- Df_BL.SubSet %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    pp.mean = mean(Perspiration, na.rm = T),
+    pp_log_mean = mean(pp_log, na.rm = T),
+    HR.E4_mean = mean(HR.E4, na.rm = T),
+    HR.E4.perfect_mean = mean(HR.E4_perfect, na.rm = T),
+    HR.AW_mean = mean(HR.AW, na.rm = T)
+  )
+
+
+Df_Exam.SubSet2 <- Df_Exam.SubSet %>%
+  group_by(ParticipantID, Question.Name, Question.Type) %>%
+  summarise(
+    Question.Order = first(Question.Order),
+    Question.Number = first(Question.Number),
+    q.solv.time = n(),
+    grade = first(Attempt.Correctness),
+    pp.mean = mean(Perspiration, na.rm = T),
+    pp_log_mean = mean(pp_log, na.rm = T),
+    HR.E4_mean = mean(HR.E4, na.rm = T),
+    HR.E4.perfect_mean = mean(HR.E4_perfect, na.rm = T),
+    HR.AW_mean = mean(HR.AW, na.rm = T)
+  )
+
+
+# initialize new columns
+
+Df_Exam.SubSet2$pp_normalized <- NA
+Df_Exam.SubSet2$pp_log_normalized <- NA
+
+Df_Exam.SubSet2$hr.e4_normalized <- NA
+Df_Exam.SubSet2$hr.e4_perfect_normalized <- NA
+Df_Exam.SubSet2$hr.aw_normalized <- NA
+
+for (p in unique(Df_Exam.SubSet$ParticipantID)) {
+  # PP Mean
+  tmpExam_pp.mean <- Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$pp.mean
+  tmpBL_pp.mean <- Df_BL.SubSet2[Df_BL.SubSet2$ParticipantID == p, ]$pp.mean
+
+  # PP Log Mean
+  tmpExam_PP_Log_Mean <- Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$pp_log_mean
+  tmpBL_PP_Log_Mean <- Df_BL.SubSet2[Df_BL.SubSet2$ParticipantID == p, ]$pp_log_mean
+
+  # HR.E4 Mean
+  tmpExam_HR.E4_Mean <- Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$HR.E4_mean
+  # you might need E4 perfected Exam, too
+  tmpExam_HR.E4_Perfect_Mean <- Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$HR.E4.perfect_mean
+
+  tmpBL_HR.E4_Mean <- Df_BL.SubSet2[Df_BL.SubSet2$ParticipantID == p, ]$HR.E4_mean
+  tmpBL_HR.E4_Perfect_Mean <- Df_BL.SubSet2[Df_BL.SubSet2$ParticipantID == p, ]$HR.E4.perfect_mean
+
+
+  # HR.AW Mean
+  tmpExam_HR.AW_Mean <- Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$HR.E4_mean
+  tmpBL_HR.AW_Mean <- Df_BL.SubSet2[Df_BL.SubSet2$ParticipantID == p, ]$HR.AW_mean
+
+
+
+
+  Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$pp_normalized <- tmpExam_pp.mean - tmpBL_pp.mean
+  Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$pp_log_normalized <- tmpExam_PP_Log_Mean - tmpBL_PP_Log_Mean
+  Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$hr.e4_normalized <- tmpExam_HR.E4_Mean - tmpBL_HR.E4_Mean
+
+
+  Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$hr.e4_perfect_normalized <- tmpExam_HR.E4_Perfect_Mean - tmpBL_HR.E4_Perfect_Mean
+
+  Df_Exam.SubSet2[Df_Exam.SubSet2$ParticipantID == p, ]$hr.aw_normalized <- tmpExam_HR.AW_Mean - tmpBL_HR.AW_Mean
+
+
+  print(p)
+}
+
+# names(Df_Exam.SubSet2)
+```
+
+```{r include=FALSE}
+rm(Qlevel)
+Qlevel <- merge(Df_Exam.SubSet2, unique(Df_Exam.SubSet[
+  ,
+  c("ParticipantID", "Gender", "SAI.Score")
+]),
+by.x = "ParticipantID", by.y = "ParticipantID", all.x = TRUE
+)
+
+
+Qlevel <- droplevels(Qlevel)
+
+table(Qlevel$Question.Type)
+unique(Qlevel$Question.Type)
+
+# names(Qlevel)
+
+Qlevel$Gender <- as.factor(Qlevel$Gender)
+
+Qlevel$Question.Type <- as.factor(Qlevel$Question.Type)
+```
+
+
+# Relevel the factors
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Base gender M
+Qlevel_rl <- within(Qlevel, Gender <- relevel(Gender, ref = "M"))
+
+# Base Question.Type W -  # Question.Type => V > W=A
+Qlevel_rl$Question.Type <- factor(Qlevel_rl$Question.Type)
+Qlevel_rl <- within(Qlevel, Question.Type <- relevel(Question.Type, ref = "W"))
+# names(Qlevel_rl)
+```
+
+
+
+
+```{r echo=FALSE}
+tmpD <- Qlevel_rl
+dim(tmpD)
+VarNames0 <- names(tmpD)
+
+VarNames <- c(
+  "S", "QName", "QType", "QOrder", "QNumber", "QSolTime", "Grade",
+  "PPMean", "PPlogMean", "HRE4Mean", "HRE4PerfMean", "HRAWMean", "PPNorm",
+  "PPlogNorm", "HRE4Norm", "HRE4PerfNorm", "HRAWNorm", "Gender", "SAI"
+)
+
+
+VarNames0
+VarNames
+
+##############################################################
+##############################################################
+##############################################################
+### MODEL (A)
+### HERE WE WILL EXAMINE THE FIRST OF THE RESPONSE VARIABLES:
+### Grade WHICH IS BINARY
+##############################################################
+##############################################################
+##############################################################
+
+### Response variable is Grade, i.e. if it Pass (1) or not (0)
+### the question of the test
+Grade <- tmpD[, 7]
+# table(Grade)
+
+### Explanatory Variables
+tmp1 <- 1:dim(tmpD)[2]
+tmp1 <- tmp1[-7]
+X <- tmpD[, tmp1] ### The explanatory variables that will be used in the modeling
+Xnames0 <- VarNames0[tmp1] ### The names of the explanatory variables
+Xnames <- VarNames[tmp1] ### The names of the explanatory variables
+
+
+### Here we will define the Categorical and Numerical values for the
+### specific response that we examine. These variables refer to X (not tmpD)
+### The following are the categorical explanatory variable
+tmpCAT <- c(2:3, 17)
+### The following are the numerical explanatory variable
+tmpNUM <- c(4:16, 18)
+
+### Here we define the Subjects that participated in the study, which will
+### form the random effects
+SubNames <- unique(X[, 1])
+Sub <- factor(X[, 1])
+
+### Here we name the variables to use them in the model
+for (i in tmpCAT) {
+  assign(paste(Xnames[i]), as.factor(X[, i]))
+}
+for (i in tmpNUM) {
+  assign(paste(Xnames[i]), X[, i])
+}
+
+### Here we will put Video in QType to be the baseline
+QType <- factor(QType, levels = c("V", "A", "W"))
+
+
+### Here we scale the variables for the Generalized Model
+sQSolTime <- scale(QSolTime)
+sPPlogMean <- scale(PPlogMean)
+sPPlogNorm <- scale(PPlogNorm)
+sHRE4PerfMean <- scale(HRE4PerfMean)
+sHRE4PerfNorm <- scale(HRE4PerfNorm)
+sSAI <- scale(SAI)
+
+Grade <- factor(Grade)
+```
+
+\newpage
+# 1- Modeling Grade vs fixed effects and  Normalized-type stress variables
+
+## Full Model
+
+```{r echo=FALSE}
+
+FullModel1 <- glmer(Grade ~ Gender + QType + QSolTime + PPlogNorm + HRE4PerfNorm + SAI
+  + (1 | QName), family = binomial)
+summary(FullModel1)
+anova(FullModel1)
+```
+
+
+
+## Full Model with scaled variables
+
+```{r echo=FALSE}
+
+#########################################################################
+### Modeling Grade vs fixed effects and  Normalized-type stress variables
+#########################################################################
+FullModel <- glmer(Grade ~ Gender + QType + sQSolTime + sPPlogNorm + sHRE4PerfNorm + sSAI
+  + (1 | QName), family = binomial)
+summary(FullModel)
+anova(FullModel)
+```
+
+# Manual Optimization
+## Remove SAI 
+
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + QType + sQSolTime + sPPlogNorm + sHRE4PerfNorm
+  + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+# FM = FullModel
+```
+
+## Remove QType 
+
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + sQSolTime + sPPlogNorm + sHRE4PerfNorm
+  + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+
+## Remove sPPlogNorm -> Optimal Model
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + sQSolTime + sHRE4PerfNorm + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+## Remove sQSolTime
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + sHRE4PerfNorm + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+## Remove Gender
+```{r echo=FALSE}
+FM <- glmer(Grade ~ sHRE4PerfNorm + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+\newpage
+## Optimal Model
+
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + sQSolTime + sHRE4PerfNorm + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+
+\newpage
+### Here we will plot the fixed effects
+
+```{r echo=FALSE}
+### Here we will plot the fixed effects
+plot_model(FM, "est", sort = TRUE, show.values = TRUE, value.offset = .3, xlab = "")
+```
+
+\newpage
+### Here we will plot the random effects
+
+```{r echo=FALSE}
+### Here we will plot the random effects
+re.plot <- plot_model(FM, "re")
+re.plot
+```
+
+\newpage
+
+
+
+
+\newpage
+# 2- Modeling Grade vs fixed effects and Mean stress variables
+## Full Model
+
+```{r echo=FALSE}
+##################################################################
+### Modeling Grade vs fixed effects and Mean stress variables
+##################################################################
+FullModel <- glmer(Grade ~ Gender + QType + sQSolTime + sPPlogMean + sHRE4PerfMean + sSAI
+  + (1 | QName), family = binomial)
+
+summary(FullModel)
+anova(FullModel)
+```
+# Manual Optimization
+## Remove sPPlogMean 
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + QType + sQSolTime + sHRE4PerfMean + sSAI
+  + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+## Remove sHRE4PerfMean 
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + QType + sQSolTime + sSAI
+  + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+## Remove QType -> Optimal Model
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + sQSolTime + sSAI + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+
+## Remove sSAI 
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + sQSolTime + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+
+## Remove sQSolTime 
+
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+
+\newpage
+## Optimal Model
+
+```{r echo=FALSE}
+FM <- glmer(Grade ~ Gender + sQSolTime + sSAI + (1 | QName), family = binomial)
+summary(FM)
+anova(FM)
+```
+
+\newpage
+### Here we will plot the fixed effects
+
+```{r echo=FALSE}
+### Here we will plot the fixed effects
+plot_model(FM, "est", sort = TRUE, show.values = TRUE, value.offset = .3, xlab = "")
+```
+
+\newpage
+### Here we will plot the random effects
+
+```{r echo=FALSE}
+### Here we will plot the random effects
+plot_model(FM, "re")
+```
