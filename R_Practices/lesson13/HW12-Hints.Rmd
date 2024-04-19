@@ -57,9 +57,10 @@ Before applying the appropriate test, check if any pre-conditions are violated a
 
 # PLAN
 
-  - Friedman test (repeated measures ANOVA)
   - Kruskal-Wallis test (one-way ANOVA)
+  - Friedman test (repeated measures ANOVA)
   - Best normalization
+  - Post-hoc analysis
 
 
 1. The Kruskal-Wallis test when you have independent observations and non-normally distributed data across three or more groups. \
@@ -243,40 +244,6 @@ DT.score
 
 The pairwise comparison shows that, A and V groups are significantly different from each other.
 
-```{r}
-library(bestNormalize)
-
-bestNormalize(score.df$correct_score)
-bn_cs <- bestNormalize(score.df$correct_score)
-bn_cs_nt <- shapiro.test(bn_cs$x.t)
-bn_cs_nt
-```
-
-## Kruskal Test Result (SQRT Transformation)
-
-```{r}
-result.kruskal_sqrt <- kruskal_test(sqrt(correct_score) ~ Question.Type, data = score.df)
-result.kruskal_sqrt
-
-
-result.kruskal
-```
-
-
-## Dunn Test (SQRT Transformation)
-```{r}
-# Dunn Tests
-DT.score <- dunnTest(sqrt(correct_score) ~ Question.Type,
-  data = score.df,
-  method = "bonferroni"
-) # Adjusts p-values for multiple comparisons;
-# See ?dunnTest for options
-
-DT.score
-```
-
-What is changed after sqrt() transformation? 
-
 
 \
 \
@@ -289,8 +256,9 @@ What is changed after sqrt() transformation?
 # Friedman test 
 
 Similar to the parametric repeated measures ANOVA, 
-it is used to detect differences in treatments across 
-independent groups.
+it is used to detect if there are any statistically 
+significant differences between the distributions 
+of three or more paired groups.
 
 
 ```{r}
@@ -337,6 +305,30 @@ ggboxplot(score.df, x = "Question.Type", y = "correct_score", add = "point") +
     caption = get_pwc_label(pwc)
   )
 ```
+
+
+## Visualization of results with differences
+```{r}
+
+#Create different groups for the Question.Type variable
+
+
+A = score.df[score.df$Question.Type =="A",]$correct_score
+W = score.df[score.df$Question.Type =="W",]$correct_score
+V = score.df[score.df$Question.Type =="V",]$correct_score
+
+AW = A - W
+AV = A - V
+VW = V - W
+
+diff.df = as.data.frame(cbind(AW, AV, VW))
+
+boxplot(diff.df, col = c("red", "blue", "green"), main = "Boxplot of the differences")
+
+```
+A > V
+W > V
+A ? W
 
 
 Results of the Friedman test indicate that there is a significant difference between the groups.
