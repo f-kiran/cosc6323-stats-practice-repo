@@ -1,0 +1,346 @@
+---
+title: "HW12 Hints "
+author: "COSC6323/Spring 2024"
+date: "`r Sys.Date()`"
+output: pdf_document
+toc: true
+
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+library(lme4)
+library(readr)
+library(lmerTest)
+library(lattice)
+library(gridExtra)
+library(kableExtra)
+require(ggpmisc) # for stat_poly_eq
+library(bestNormalize)
+library(FSA)
+library(rstatix)
+```
+
+```{r include=FALSE}
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+
+
+\newpage
+
+# Question
+
+We want to find out if there are any mean differences in terms of performance  among VIDEO, WORD, and ABSTRACT. Furthermore, if there are indeed differences, we would like to compute the relative order of sympathetic activation among the three treatments, that is, which one is the biggest, which one is in the middle, and which one is the lowest. 
+
+Before applying the appropriate test, check if any pre-conditions are violated and take ameliorating measures as needed. 
+
+\
+\
+\
+
+# PLAN
+
+  - Friedman test (repeated measures ANOVA)
+  - Kruskal-Wallis test (one-way ANOVA)
+  - Best normalization
+
+
+1. The Kruskal-Wallis test when you have independent observations and non-normally distributed data across three or more groups. \
+
+2. The Friedman test when dealing with repeated measures or ordinal(ranked) data \
+
+
+
+
+
+```{r echo=FALSE}
+Df <- read.csv("../Data/Affective-Math-Dataset_3.csv", stringsAsFactors = T)
+
+# Exam data
+Df_Exam <- Df[Df$Session == "Exam", ]
+# names(Df_Exam)
+# Remove unnecessary columns
+Df_Exam <- subset(Df_Exam,
+  select = c(
+    ParticipantID, Perspiration, HR.E4, HR.AW,
+    Question.Type, Question.Name, Time, Attempt, Accuracy.Score
+  )
+)
+
+
+# Remove 2nd and 3rd attempts
+Df_Exam <- Df_Exam[Df_Exam$Attempt == 1, ]
+
+Df_Exam <- Df_Exam[Df_Exam$Question.Type != "Example", ]
+
+# Remove NAs
+Df_Exam <- Df_Exam[!is.na(Df_Exam$Question.Type), ]
+
+
+Df_Exam <- droplevels(Df_Exam)
+# str(Df_Exam)
+
+# unique(Df_Exam$Question.Type)
+# unique(Df_Exam$ParticipantID)
+```
+
+
+\newpage
+
+```{r warning=FALSE, include=FALSE}
+Qlevel <- Df_Exam %>%
+  group_by(ParticipantID, Question.Name, Question.Type) %>%
+  summarise(
+    pp.mean = mean(Perspiration, na.rm = T),
+    HR.E4.mean = mean(HR.E4, na.rm = T),
+    HR.AW.mean = mean(HR.AW, na.rm = T),
+    q.solv.time = n(),
+    Accuracy.Score = first(Accuracy.Score)
+  ) %>%
+  convert_as_factor(Accuracy.Score)
+
+
+# 1) For every subject compute the total sum of grades per question group
+
+Qlevel2 <- Qlevel %>%
+  group_by(ParticipantID, Question.Type) %>%
+  mutate(
+    n = n(),
+    correct_score = sum(Accuracy.Score == 1),
+  ) %>%
+  convert_as_factor(ParticipantID, Question.Type)
+```
+
+
+# Summary statistics
+```{r}
+score.df <- Qlevel2 %>%
+  select(ParticipantID, Question.Type, correct_score) %>%
+  distinct() %>%
+  convert_as_factor(ParticipantID, Question.Type) %>%
+  ungroup()
+
+
+score.df %>%
+  group_by(Question.Type) %>%
+  get_summary_stats(correct_score, type = "common") %>%
+  kable("latex", booktabs = T, digits = 3) %>%
+  kable_styling(latex_options = c("stripdown", "hold_position"), font_size = 7)
+```
+
+\
+\
+\
+
+# Data visualization
+
+```{r fig.height=5}
+ggboxplot(score.df, x = "Question.Type", y = "correct_score", add = "jitter")
+
+
+# score.df <- score.df[score.df$correct_score != 0,]
+
+# table(score.df$correct_score)
+# table(score.df$Question.Type)
+# table(score.df$ParticipantID)
+
+# colSums(is.na(score.df))
+```
+
+\newpage
+
+
+
+# Kruskal-Wallis test (one-way ANOVA)
+
+It is a non-parametric version of the one-way ANOVA,
+situation where there are more than two groups. 
+
+```{r}
+# Kruskal-Wallis test
+
+?kruskal_test()
+
+result.kruskal <- kruskal_test(correct_score ~ Question.Type, data = score.df)
+result.kruskal
+```
+
+Since the p-value is less than 0.05, we can reject the null hypothesis and conclude that there is a significant difference between the groups.
+
+
+## Effect size of Kruskal-Wallis
+```{r}
+?rstatix::kruskal_effsize
+score.df %>% kruskal_effsize(correct_score ~ Question.Type)
+
+# The interpretation values commonly in published literature are: 
+# 0.01- < 0.06 (small effect), 
+# 0.06 - < 0.14 (moderate effect) 
+# and >= 0.14 (large effect).
+```
+
+## Multiple pairwise-comparisons for Kruskal-Wallis
+
+```{r}
+?wilcox_test()
+pwc.kw <- score.df %>%
+  wilcox_test(correct_score ~ Question.Type,
+    paired = FALSE,
+    p.adjust.method = "bonferroni"
+  )
+# p.adjust.method = "bh")
+# Adjusted p-values for multiple comparisons
+
+pwc.kw
+```
+
+## Visualization of Kruskal-Wallis results
+
+```{r}
+pwc.kw <- pwc.kw %>% add_xy_position(x = "Question.Type")
+
+ggboxplot(score.df, x = "Question.Type", y = "correct_score", add = "point") +
+  stat_pvalue_manual(pwc.kw, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(result.kruskal, detailed = TRUE),
+    caption = get_pwc_label(pwc.kw)
+  )
+```
+
+
+## Dunn Test
+
+```{r}
+?dunnTest
+
+# Pairwise comparisons
+DT.score <- dunnTest(correct_score ~ Question.Type,
+  data = score.df,
+  # method="bh")
+  method = "bonferroni"
+)
+
+# print(DT.score, dunn.test.results = TRUE)
+DT.score
+```
+
+The pairwise comparison shows that, A and V groups are significantly different from each other.
+
+```{r}
+library(bestNormalize)
+
+bestNormalize(score.df$correct_score)
+bn_cs <- bestNormalize(score.df$correct_score)
+bn_cs_nt <- shapiro.test(bn_cs$x.t)
+bn_cs_nt
+```
+
+## Kruskal Test Result (SQRT Transformation)
+
+```{r}
+result.kruskal_sqrt <- kruskal_test(sqrt(correct_score) ~ Question.Type, data = score.df)
+result.kruskal_sqrt
+
+
+result.kruskal
+```
+
+
+## Dunn Test (SQRT Transformation)
+```{r}
+# Dunn Tests
+DT.score <- dunnTest(sqrt(correct_score) ~ Question.Type,
+  data = score.df,
+  method = "bonferroni"
+) # Adjusts p-values for multiple comparisons;
+# See ?dunnTest for options
+
+DT.score
+```
+
+What is changed after sqrt() transformation? 
+
+
+\
+\
+\
+
+
+
+
+\newpage
+# Friedman test 
+
+Similar to the parametric repeated measures ANOVA, 
+it is used to detect differences in treatments across 
+independent groups.
+
+
+```{r}
+?friedman_test
+res.fried <- score.df %>%
+  friedman_test(correct_score ~ Question.Type | ParticipantID)
+
+res.fried
+```
+Since the p-value is less than 0.05, we reject the null hypothesis that there is no difference in the mean scores among the three treatments.
+
+Consider the following post-hoc tests to determine the relative order of sympathetic activation among the three treatments. 
+
+
+## Effect size Friedman test
+```{r}
+?rstatix::friedman_effsize
+score.df %>% friedman_effsize(correct_score ~ Question.Type | ParticipantID)
+
+# The interpretation values commonly in published literature are:
+# 0.01- < 0.06 (small effect), 
+# 0.06 - < 0.14 (moderate effect) 
+# and >= 0.14 (large effect).
+```
+
+## Multiple pairwise-comparisons
+
+```{r}
+# Multiple pairwise-comparisons for Kruskal-Wallis
+pwc <- score.df %>%
+  wilcox_test(correct_score ~ Question.Type, paired = TRUE, p.adjust.method = "bonferroni")
+
+pwc
+```
+
+
+## Visualization of results
+```{r}
+pwc <- pwc %>% add_xy_position(x = "Question.Type")
+ggboxplot(score.df, x = "Question.Type", y = "correct_score", add = "point") +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) +
+  labs(
+    subtitle = get_test_label(res.fried, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+  )
+```
+
+
+Results of the Friedman test indicate that there is a significant difference between the groups.
+
+
+
+
