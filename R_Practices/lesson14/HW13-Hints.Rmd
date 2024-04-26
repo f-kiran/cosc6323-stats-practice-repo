@@ -1,0 +1,517 @@
+---
+title: "HW13 Hints "
+author: "COSC6323/Spring 2024"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: 
+    toc: true
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+
+\newpage
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(latex2exp)
+library(cowplot)
+library(ggpubr)
+library(readr)
+library(lattice)
+library(gridExtra)
+library(kableExtra)
+library(lme4)
+library(lmerTest) # get the best model
+require(ggpmisc) # stat on plots with facets
+library(rstatix) # tests
+library(qqplotr)
+library(sjPlot) # tab_model()
+library(dplyr)
+library(glmtoolbox) # Show the adjusted R2 in glm
+library(arm) # convenience functions for regression in R display()
+library(ggcorrplot)
+
+theme_set(theme_classic()) # set the theme to classic
+theme_update(plot.title = element_text(hjust = 0.5)) # center the title
+
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+
+
+
+# Utility Functions
+```{r echo=FALSE, fig.height=11, fig.width=20, message=FALSE, warning=FALSE}
+# Without x axis label first rows
+my_theme <- theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    strip.text = element_text(size = 18),
+    legend.position = "none"
+  )
+
+# With  x-y axis label
+my_theme1 <- my_theme +
+  theme(
+    axis.text.x = element_text(size = 8, face = "bold")
+  )
+
+activity_names <- c(
+  `office_work` = "Office Work",
+  `walking` = "Walking",
+  `running` = "Running",
+  `biking` = "Biking",
+  `driving` = "Driving"
+)
+
+# helper for boxplot
+n_fun <- function(x) {
+  return(data.frame(y = median(x) * 1.3, label = paste0("~italic(n)", " == ", length(x))))
+}
+
+
+mycolors <- c(
+  unknown = "white", office_work = "darkgray", walking = "darkolivegreen",
+  running = "deepskyblue", biking = "orange",
+  driving = "deeppink3"
+)
+```
+
+
+
+
+# Read the raw data
+
+```{r eval=FALSE, include=FALSE}
+all.df2 <- read.csv(paste0("../Data/Naturalistic-Multimodal-Activity-Dataset_v5.csv"), stringsAsFactors = F)
+
+colSums(is.na(all.df2))
+str(all.df2)
+
+
+all.df2$Time <- as.POSIXct(all.df2$Time, format = "%Y-%m-%d %H:%M:%S")
+#
+factor(all.df2$Day2)
+
+all.df2$Day2 <- factor(all.df2$Day2,
+  levels = c("PR", "MD", "MD2", "PS", "PS2", "RD", "RD2")
+)
+levels(all.df2$Period)
+
+all.df2$Period <- as.factor(all.df2$Period)
+all.df2$Gender <- as.factor(all.df2$Gender)
+
+all.df2$Time2 <- format(all.df2$Time, "%H:%M:%S")
+
+all.df2$Time2 <- as.POSIXct(all.df2$Time2, format = "%H:%M:%S")
+
+
+
+# Check for missing values
+colSums(is.na(all.df2))
+
+str(all.df2)
+```
+
+## Cut the time into 1 min intervals
+
+```{r eval=FALSE, include=FALSE}
+colnames(all.df2)
+
+# Add Day2 Label here
+# Remove NAs from the data
+str(all.df2)
+colnames(all.df2)
+colSums(is.na(all.df2))
+
+
+# helper to get the max values names from the aggreegated data.
+max_freq <- function(x) {
+  return(names(which.max(table(x))))
+}
+
+
+all.df2_cut <- all.df2 %>%
+  # filter(ID == "T009") %>%
+  group_by(ID, Time) %>%
+  # Time needs to be Posixct
+  mutate(
+    Time =
+      as.POSIXct(Time, format = "%Y-%m-%d %H:%M:%S") %>%
+        floor_date("1 min")
+  ) %>%
+  summarise(
+    ID = first(ID),
+    Day = first(Day),
+    Activity = first(Activity),
+    Day2 = first(Day2),
+    Period = first(Period),
+    # return name of max index
+    max_ind = max_freq(max_ind),
+    HR_normalized = mean(HR_normalized, na.rm = TRUE),
+    HR = mean(HR, na.rm = TRUE),
+    Speed = mean(Speed, na.rm = TRUE),
+    Cadence = mean(Cadence, na.rm = TRUE),
+    Altitude = mean(Altitude, na.rm = TRUE),
+    Distances = mean(Distances, na.rm = TRUE),
+    Temperatures = mean(Temperatures, na.rm = TRUE),
+    Power = mean(Power, na.rm = TRUE),
+    Speed_NR = mean(Speed_NR, na.rm = TRUE),
+    Pace2 = mean(Pace2, na.rm = TRUE),
+    # new variables
+    Age = first(Age),
+    Gender = first(Gender),
+    BMI = first(BMI)
+  ) %>%
+  ungroup()
+
+# save
+write.csv(all.df2_cut, "Naturalistic-Multimodal-Activity-Dataset_v5_1min.csv", row.names = F)
+
+
+```
+
+## Read aggregated data
+
+```{r include=FALSE}
+all.df2_cut = read.csv("Naturalistic-Multimodal-Activity-Dataset_v5_1min.csv", stringsAsFactors = T )
+
+all.df2_cut$Time <- as.POSIXct(all.df2_cut$Time, format = "%Y-%m-%d %H:%M:%S")
+
+all.df2_cut$Time2 <- format(all.df2_cut$Time, "%H:%M:%S")
+all.df2_cut$Time2 <- as.POSIXct(all.df2_cut$Time2, format = "%H:%M:%S")
+
+all.df2_cut$Day2 <- factor(all.df2_cut$Day2,
+  levels = c("PR", "MD", "MD2", "PS", "PS2", "RD")
+)
+
+# Have only 4 levels for Day2 data
+all.df2_cut$Day3 <- recode_factor(all.df2_cut$Day2,
+                                  "PR" = "PR", "PR2" = "PR", "MD" = "MD", "MD2" = "MD", "PS" = "PS", "PS2" = "PS", "RD" = "RD"
+)
+
+all.df2_cut$Day2 <- all.df2_cut$Day3 %>% as.factor()
+all.df2_cut$Day3 <- NULL
+
+# Day2 reference level is MD
+all.df2_cut$Day2 <- relevel(all.df2_cut$Day2, ref = "MD")
+colSums(is.na(all.df2_cut))
+
+# Period reference level is Afternoon
+all.df2_cut$Period <- relevel(all.df2_cut$Period, ref = "Afternoon")
+colSums(is.na(all.df2_cut))
+
+# Activity reference level is office_work
+all.df2_cut$max_ind <- relevel(all.df2_cut$max_ind, ref = "office_work")
+colSums(is.na(all.df2_cut))
+
+all.df3_cut <- all.df2_cut %>%
+  rename(
+  Participant = ID,
+  Init.Day = Day,
+  Day = Day2,
+  Distance = Distances,
+  Init.Speed = Speed,
+  Speed = Speed_NR,
+  Temperature = Temperatures,
+  Init.Activity = Activity,
+  Activity = max_ind
+  )
+
+levels(all.df3_cut$Activity) <- c("Office.Home", "Biking", "Driving", "Running", "Unknown", "Walking")
+
+
+# Remove NAs from the data
+all.df3_cut <- all.df3_cut %>%
+  filter(Day != "NA") %>%
+  filter(Activity != "Unknown") %>% droplevels()
+
+
+all.df3_cut$Activity
+
+```
+
+
+
+## Create boxplot for HR by Day
+
+```{r echo=FALSE}
+all.df3_cut %>%
+  ggplot(aes(x = Day, y = HR, fill = Day)) +
+  geom_boxplot() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Boxplot of HR by Day",
+    x = "Day",
+    y = "HR"
+  ) +   stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median, angle = 90,
+    parse = T, size = 3, vjust = -0.75, hjust = 0,
+    position = position_dodge(width = 0.75)
+  )
+```
+
+
+\newpage
+# Question 1 - Generalized Linear Regression - HR vs. Various Predictors with Fixed Effects
+
+
+```{r include=FALSE}
+## Inspection of the data
+
+all.df.glm <- all.df3_cut %>%
+  dplyr::select(Participant, HR, Speed, Cadence, Altitude, Distance, Temperature, Power, Pace2, Period, Age, BMI, Activity, Day) %>%
+  drop_na()
+
+dim(all.df.glm)
+str(all.df.glm)
+sum(is.na(all.df.glm))
+colSums(is.na(all.df.glm))
+```
+
+
+# Multi Linear Model and diagnostic
+
+## COLLINEARITY CHECK including all predictors
+
+```{r fig.height=10, fig.width=10, warning=FALSE}
+
+reduced_data <- subset(all.df.glm, select = -c(Participant))
+
+model.matrix(~ 0 + ., data = reduced_data) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  ggcorrplot(show.diag = FALSE, type = "lower", lab = TRUE)
+```
+
+
+
+
+
+
+
+<!-- Ref.:  -->
+<!-- https://rpubs.com/JSHAH/481706 -->
+<!-- https://medium.com/analytics-vidhya/interpreting-acf-or-auto-correlation-plot-d12e9051cd14 -->
+<!-- https://towardsdatascience.com/identifying-ar-and-ma-terms-using-acf-and-pacf-plots-in-time-series-forecasting-ccb9fd073db8 -->
+<!-- https://a-little-book-of-r-for-time-series.readthedocs.io/en/latest/src/timeseries.html -->
+
+
+
+
+```{r echo=FALSE}
+
+library(tseries)
+library(forecast)
+
+HR_data = ts(all.df.glm$HR)
+
+is.ts(HR_data)
+
+summary(HR_data)
+start(HR_data)
+end(HR_data)
+time(HR_data)
+frequency(HR_data)
+ts.plot(HR_data)
+acf(HR_data)
+pacf(HR_data)
+
+```
+
+
+```{r echo=FALSE}
+# Auto correlation
+
+?acf
+acf(HR_data,  plot = F)
+acf(HR_data, plot = TRUE)
+acf(HR_data, lag.max = 720, plot = T)
+
+HRts = ts(HR_data, frequency = 1) # Since the data big, 1 is used to save time
+#HRts = ts(HR_data, frequency = 10)
+#HRts = ts(HR_data, frequency = 20)
+#HRts = ts(HR_data, frequency = 60)
+
+
+#partial auto correlation
+#stationary test
+?adf.test() # check our ts is stationary or not
+adf.test(HR_data, alternative = "stationary", k = 1)
+adf.test(HR_data, alternative = "stationary", k = 4)
+adf.test(HR_data, alternative = "stationary", k = 720)
+
+
+
+```
+
+# Find Best ARIMA model
+
+
+```{r echo=FALSE}
+# since P values is less than 0.05, we can say that our data is stationary that means we can use ARIMA model
+
+find_best = auto.arima(HRts, 
+                       stepwise = FALSE,
+                       approximation = FALSE, 
+                       trace = F, ic = "aicc")
+find_best
+
+
+```
+```{r}
+HRts %>%
+  Arima(order=c(1,1,4), seasonal=c(1,1,4)) %>%
+  residuals() %>% ggtsdisplay()
+```
+
+
+
+```{r echo=FALSE}
+
+# check residuals
+qqnorm(find_best$residuals)
+qqline(find_best$residuals)
+hist(find_best$residuals)
+
+
+```
+
+# Forecast the data
+```{r echo=FALSE}
+# forecast the data
+plot(forecast(find_best, h = 300))
+
+```
+
+
+- Autocorrelation represents the degree of similarity between a given time series 
+and a lagged version of itself over successive time intervals.
+- Autocorrelation measures the relationship between a variable’s current value and its past values.
+- An autocorrelation of +1 represents a perfect positive correlation, 
+while an autocorrelation of negative 1 represents a perfect negative correlation.
+
+
+*Now time pay attention more!*
+
+
+## HR Final Model | Best model from HW9
+
+
+```{r echo=FALSE}
+
+hr_multi_model <-
+  glmer(
+  formula = HR ~ Cadence + Altitude + Temperature + Day*Period + Activity + (1 | Participant),
+  data = all.df.glm
+)
+
+summary(hr_multi_model)
+
+
+acf(residuals(hr_multi_model))
+pacf(residuals(hr_multi_model))
+
+#plot(residuals(hr_multi_model))
+
+
+sjPlot::plot_model(hr_multi_model,
+                   show.values=TRUE, show.p=TRUE,
+                   title="") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) + theme_bw()
+
+
+```
+
+
+\newpage
+
+## HR Final Model - Diagnostic ACF and PACF
+
+```{r echo=FALSE}
+
+HR = all.df.glm$HR
+Participant = all.df.glm$Participant
+Speed = all.df.glm$Speed
+Cadence = all.df.glm$Cadence
+Altitude = all.df.glm$Altitude
+Temperature = all.df.glm$Temperature
+Power = all.df.glm$Power
+Period = all.df.glm$Period
+Activity = all.df.glm$Activity
+Day = all.df.glm$Day
+
+
+HR1<-HR[2:length(HR)]
+HR1lag1<-HR[1:(length(HR)-1)]
+
+### Random Effects in the model:
+Participant1<-Participant[2:length(HR)]
+
+### Fixed Effects in the model:
+Speed1<-Speed[2:length(HR)]
+Cadence1<-Cadence[2:length(HR)]
+Altitude1<-Altitude[2:length(HR)]
+Temperature1<-Temperature[2:length(HR)]
+Power1<-Power[2:length(HR)]
+Period1<-Period[2:length(HR)]
+Activity1<-Activity[2:length(HR)]
+Day1<-as.factor(Day[2:length(HR)])
+
+### Create a data frame with the variables
+
+hr_multi_model2 = glmer(HR1 ~ HR1lag1 + (1|Participant1)  + Cadence1 + Altitude1 + Temperature1  + Period1 + Activity1 + Day1)
+
+summary(hr_multi_model2)
+
+acf(residuals(hr_multi_model2))
+pacf(residuals(hr_multi_model2))
+
+sjPlot::plot_model(hr_multi_model2,
+                   show.values=TRUE, show.p=TRUE,
+                   title="") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) + theme_bw()
+
+
+
+
+```
+
+```{r echo=FALSE}
+hr_multi_model3 = glmer(HR1 ~ HR1lag1 + (1|Participant1)  + Cadence1 + Altitude1 + Temperature1  + Day1*Period1 + Activity1 )
+
+
+summary(hr_multi_model3)
+
+acf(residuals(hr_multi_model3))
+pacf(residuals(hr_multi_model3))
+
+sjPlot::plot_model(hr_multi_model3,
+                   show.values=TRUE, show.p=TRUE,
+                   title="") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) + theme_bw()
+
+```
+
